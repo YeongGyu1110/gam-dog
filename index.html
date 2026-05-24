@@ -3,170 +3,510 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ExamSync | 시험 감독 배정 시스템</title>
+    <title>ExamSync | Scheduler Engine</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.8/dist/web/static/pretendard.css" />
     <style>
         :root {
-            --primary: #2563eb;       
-            --primary-hover: #1d4ed8; 
-            --bg-body: #f1f5f9;       
-            --bg-surface: #ffffff;    
-            --text-main: #1e293b;     
-            --text-muted: #64748b;    
-            --border: #cbd5e1;        
-            --border-light: #e2e8f0;  
+            --bg-app: #f5f5f4;       /* 스타크 화이트를 배제한, 눈이 편안한 웜그레이 (Stone 100) */
+            --bg-canvas: #fafaf9;    /* 강한 반사광을 차단한 크림 오프화이트 (Stone 50) */
+            --text-primary: #1c1917;  /* 부드러운 딥 브라운 그레이 (Stone 900) */
+            --text-secondary: #44403c;/* Stone 700 */
+            --text-muted: #78716c;    /* Stone 500 */
+            --border-primary: #e7e5e4;/* 경계선을 차분하게 감싸주는 소프트 샌드보더 (Stone 200) */
+            --border-muted: #f5f5f4;  /* 내부 요소를 구분하는 보조 라인 (Stone 100) */
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
             
-            --grade1-bg: #eff6ff; --grade1-text: #1d4ed8;
-            --grade2-bg: #f0fdf4; --grade2-text: #15803d;
-            --grade3-bg: #fdf2f8; --grade3-text: #be185d;
+            --g1-tint: #eff6ff; --g1-stroke: #3b82f6; --g1-text: #1d4ed8;
+            --g2-tint: #f0fdf4; --g2-stroke: #10b981; --g2-text: #047857;
+            --g3-tint: #fff1f2; --g3-stroke: #f43f5e; --g3-text: #be185d;
+            
+            --hw-active-bg: #f5f3ff;
+            --hw-active-border: #c7d2fe;
+        }
+
+        body.dark-theme {
+            --bg-app: #09090b;
+            --bg-canvas: #18181b;
+            --text-primary: #fafafa;
+            --text-secondary: #e4e4e7;
+            --text-muted: #a1a1aa;
+            --border-primary: #27272a;
+            --border-muted: #18181b;
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            
+            --g1-tint: rgba(59, 130, 246, 0.15); --g1-stroke: #3b82f6; --g1-text: #60a5fa;
+            --g2-tint: rgba(16, 185, 129, 0.15); --g2-stroke: #10b981; --g2-text: #34d399;
+            --g3-tint: rgba(244, 63, 94, 0.15);  --g3-stroke: #f43f5e; --g3-text: #fb7185;
+
+            --hw-active-bg: rgba(99, 102, 241, 0.15);
+            --hw-active-border: rgba(99, 102, 241, 0.4);
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Pretendard', sans-serif; background-color: var(--bg-body); color: var(--text-main); line-height: 1.5; }
-
-        .toolbar {
-            position: sticky; top: 0; z-index: 100;
-            background-color: var(--bg-surface);
-            border-bottom: 1px solid var(--border);
-            padding: 12px 24px;
-            display: flex; justify-content: space-between; align-items: center;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        body { 
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif; 
+            background-color: var(--bg-app); 
+            color: var(--text-primary); 
+            line-height: 1.4; 
+            -webkit-font-smoothing: antialiased;
+            transition: background-color 0.2s, color 0.2s;
         }
-        .brand { display: flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 700; color: var(--text-main); }
-        .brand-icon { width: 24px; height: 24px; color: var(--primary); }
+
+        /* App Layout Grid */
+        .app-layout {
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            min-height: 100vh;
+        }
+
+        /* Left Workspace (Canvas / Results) */
+        .workspace {
+            padding: 40px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 32px;
+            background-color: var(--bg-app);
+            background-image: radial-gradient(var(--border-primary) 1px, transparent 1px);
+            background-size: 24px 24px;
+        }
+
+        .workspace-card {
+            background: var(--bg-canvas);
+            border: 1px solid var(--border-primary);
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.02);
+        }
+
+        .workspace-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            gap: 12px;
+        }
+
+        .section-title {
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: -0.01em;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+        .section-desc {
+            font-size: 12px;
+            color: var(--text-muted);
+            font-weight: 400;
+            text-align: right;
+        }
+
+        /* Sophisticated Time Table */
+        .table-container {
+            border: 1px solid var(--border-primary);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        table { width: 100%; border-collapse: collapse; user-select: none; table-layout: fixed; background-color: var(--bg-canvas); }
+        th, td { border: 1px solid var(--border-primary); padding: 0; text-align: center; font-size: 12px; height: 38px; }
+        th { background: var(--bg-app); font-weight: 600; color: var(--text-muted); font-size: 11px; letter-spacing: -0.01em; }
         
-        .toolbar-actions { display: flex; align-items: center; gap: 12px; }
-        .file-upload-wrapper { position: relative; }
+        .g1-header { border-bottom: 2px solid var(--g1-stroke); color: var(--g1-text); font-weight: 700; }
+        .g2-header { border-bottom: 2px solid var(--g2-stroke); color: var(--g2-text); font-weight: 700; }
+        .g3-header { border-bottom: 2px solid var(--g3-stroke); color: var(--g3-text); font-weight: 700; }
+
+        .exam-cell { cursor: crosshair; transition: all 0.1s ease; position: relative; color: var(--text-secondary); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .exam-cell:hover { background: var(--border-muted); }
+
+        /* Grade-specific styling */
+        .exam-cell.has-subject[data-grade="1"] {
+            background: var(--g1-tint) !important;
+            color: var(--g1-text);
+            box-shadow: inset 3px 0 0 0 var(--g1-stroke);
+            font-weight: 700;
+            font-size: 11px;
+        }
+        .exam-cell.has-subject[data-grade="2"] {
+            background: var(--g2-tint) !important;
+            color: var(--g2-text);
+            box-shadow: inset 3px 0 0 0 var(--g2-stroke);
+            font-weight: 700;
+            font-size: 11px;
+        }
+        .exam-cell.has-subject[data-grade="3"] {
+            background: var(--g3-tint) !important;
+            color: var(--g3-text);
+            box-shadow: inset 3px 0 0 0 var(--g3-stroke);
+            font-weight: 700;
+            font-size: 11px;
+        }
+
+        /* Dynamic Selector Highlighting */
+        .exam-cell.selected { background: rgba(79, 70, 229, 0.08) !important; color: var(--primary); }
+        .exam-cell.sel-single { box-shadow: inset 0 0 0 1.5px var(--primary); }
+        .exam-cell.sel-left { box-shadow: inset 1.5px 0 0 0 var(--primary), inset 0 1.5px 0 0 var(--primary), inset 0 -1.5px 0 0 var(--primary); }
+        .exam-cell.sel-mid { box-shadow: inset 0 1.5px 0 0 var(--primary), inset 0 -1.5px 0 0 var(--primary); }
+        .exam-cell.sel-right { box-shadow: inset -1.5px 0 0 0 var(--primary), inset 0 1.5px 0 0 var(--primary), inset 0 -1.5px 0 0 var(--primary); }
+
+        /* Right Control Column (Sidebar Panel) */
+        .control-panel {
+            background-color: var(--bg-canvas);
+            border-left: 1px solid var(--border-primary);
+            padding: 32px 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        .brand-deck {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border-muted);
+        }
+        .brand-logo {
+            width: 32px;
+            height: 32px;
+            background-color: var(--primary);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+        .brand-logo svg { width: 18px; height: 18px; }
+        .brand-info h1 { font-size: 15px; font-weight: 800; letter-spacing: -0.03em; color: var(--text-primary); }
+        .brand-info p { font-size: 11px; color: var(--text-muted); }
+
+        .hud-card {
+            background: var(--bg-app);
+            border: 1px solid var(--border-primary);
+            border-radius: 8px;
+            padding: 18px;
+        }
+        .hud-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 12px; display: flex; align-items: center; gap: 6px;}
+        .status-dot { width: 6px; height: 6px; background-color: #d4d4d8; border-radius: 50%; display: inline-block; transition: background-color 0.2s; }
+        .status-dot.active { background-color: #10b981; box-shadow: 0 0 8px #10b981; }
+
+        .control-group { display: flex; flex-direction: column; gap: 10px; }
+        .control-label { font-size: 11px; font-weight: 600; color: var(--text-secondary); }
+
+        /* Setting Steppers */
+        .settings-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        .settings-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .settings-item label {
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+        .number-stepper {
+            display: flex;
+            align-items: center;
+            border: 1px solid var(--border-primary);
+            border-radius: 6px;
+            overflow: hidden;
+            background: var(--bg-canvas);
+        }
+        .number-stepper button {
+            background: none;
+            border: none;
+            width: 28px;
+            height: 28px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: background 0.1s;
+        }
+        .number-stepper button:hover {
+            background: var(--border-muted);
+        }
+        .number-stepper input {
+            width: 100%;
+            border: none;
+            text-align: center;
+            font-size: 12px;
+            font-weight: 700;
+            background: none;
+            color: var(--text-primary);
+            pointer-events: none;
+        }
+
+        /* Figma Style Custom File Button */
+        .file-upload-wrapper { position: relative; width: 100%; }
         .file-upload-input { position: absolute; left: 0; top: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+        
         .btn {
-            display: inline-flex; align-items: center; gap: 6px;
-            padding: 8px 16px; border-radius: 6px; font-size: 14px; font-weight: 600;
-            border: 1px solid transparent; cursor: pointer; transition: all 0.2s;
+            display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+            width: 100%; padding: 10px 16px; border-radius: 6px; font-size: 13px; font-weight: 600;
+            border: 1px solid transparent; cursor: pointer; transition: all 0.15s ease;
+            letter-spacing: -0.01em;
         }
-        .btn-outline { background: var(--bg-surface); border-color: var(--border); color: var(--text-main); }
-        .btn-outline:hover { background: var(--bg-body); }
-        .btn-primary { background: var(--primary); color: white; }
-        .btn-primary:hover { background: var(--primary-hover); }
-        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        
-        .status-text { font-size: 13px; color: var(--text-muted); font-weight: 500; }
+        .btn-outline { background: var(--bg-canvas); border-color: var(--border-primary); color: var(--text-primary); box-shadow: 0 1px 2px rgba(0,0,0,0.02); }
+        .btn-outline:hover { background: var(--border-muted); border-color: #cbd5e1; }
+        .btn-primary { background: var(--text-primary); color: var(--bg-canvas); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .btn-primary:hover { background: var(--text-secondary); }
+        .btn-primary:disabled { background: var(--border-primary); color: var(--text-muted); cursor: not-allowed; box-shadow: none; }
 
-        .workspace { padding: 24px; max-width: 1440px; margin: 0 auto; display: flex; flex-direction: column; gap: 32px; }
-
-        .section-title { font-size: 16px; font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
-        .table-container { 
-            background: var(--bg-surface); border: 1px solid var(--border); 
-            border-radius: 8px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        /* Output Design Overhaul */
+        .empty-state {
+            padding: 60px 20px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
         }
-        table { width: 100%; border-collapse: collapse; user-select: none; table-layout: fixed; }
-        th, td { border: 1px solid var(--border-light); padding: 0; text-align: center; font-size: 13px; height: 40px; }
-        th { background: #f8fafc; font-weight: 600; color: var(--text-muted); padding: 8px 0; }
-        
-        .g1-header { background: var(--grade1-bg); color: var(--grade1-text); }
-        .g2-header { background: var(--grade2-bg); color: var(--grade2-text); }
-        .g3-header { background: var(--grade3-bg); color: var(--grade3-text); }
+        .empty-icon {
+            width: 48px; height: 48px;
+            color: #d4d4d8; margin-bottom: 16px;
+        }
+        .empty-state h3 { font-size: 13px; font-weight: 700; color: var(--text-secondary); margin-bottom: 4px; }
+        .empty-state p { font-size: 11px; max-width: 260px; line-height: 1.5; }
 
-        .exam-cell { cursor: crosshair; transition: background 0.1s; position: relative; color: var(--text-main); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .exam-cell:hover { background: #f1f5f9; }
+        .period-block { background: var(--bg-canvas); border: 1px solid var(--border-primary); border-radius: 12px; padding: 24px; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.02); margin-bottom: 20px; }
+        .period-block:last-child { margin-bottom: 0; }
+        .period-header { font-size: 14px; font-weight: 800; color: var(--text-primary); margin-bottom: 18px; padding-bottom: 10px; border-bottom: 1px solid var(--border-muted); letter-spacing: -0.01em; }
         
-        .exam-cell.has-subject { background: #fef3c7; font-weight: 600; color: #b45309; }
-
-        .exam-cell.selected { background: #dbeafe !important; }
-        .exam-cell.sel-single { box-shadow: inset 0 0 0 2px var(--primary); }
-        .exam-cell.sel-left { box-shadow: inset 2px 0 0 0 var(--primary), inset 0 2px 0 0 var(--primary), inset 0 -2px 0 0 var(--primary); }
-        .exam-cell.sel-mid { box-shadow: inset 0 2px 0 0 var(--primary), inset 0 -2px 0 0 var(--primary); }
-        .exam-cell.sel-right { box-shadow: inset -2px 0 0 0 var(--primary), inset 0 2px 0 0 var(--primary), inset 0 -2px 0 0 var(--primary); }
-
-        #mainOutput { display: flex; flex-direction: column; gap: 40px; }
-        .period-block { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
-        .period-header { font-size: 18px; font-weight: 700; color: var(--text-main); margin-bottom: 20px; padding-bottom: 12px; border-bottom: 2px solid var(--border-light); }
+        .building { display: flex; flex-direction: column; gap: 10px; }
+        .floor-row { display: flex; align-items: stretch; gap: 8px; background: var(--bg-app); padding: 8px; border-radius: 8px; border: 1px solid var(--border-muted); }
         
-        .building { display: flex; flex-direction: column; gap: 16px; }
-        .floor-row { display: flex; align-items: stretch; gap: 12px; background: var(--bg-body); padding: 12px; border-radius: 8px; }
-        
-        .dept-label { width: 70px; display: flex; align-items: center; justify-content: center; background: #cbd5e1; color: #334155; font-weight: 700; border-radius: 6px; font-size: 14px; flex-shrink: 0; }
+        .dept-label { width: 52px; display: flex; align-items: center; justify-content: center; background: var(--text-primary); color: var(--bg-canvas); font-weight: 800; border-radius: 5px; font-size: 11px; flex-shrink: 0; }
 
-        .class-group { display: flex; gap: 8px; flex: 1; }
-        .class-card { flex: 1; background: var(--bg-surface); border: 1px solid var(--border-light); border-radius: 6px; padding: 10px; text-align: center; display: flex; flex-direction: column; justify-content: center; }
+        .class-group { display: flex; gap: 6px; flex: 1; }
+        .class-card { flex: 1; background: var(--bg-canvas); border: 1px solid var(--border-primary); border-radius: 6px; padding: 8px; text-align: center; display: flex; flex-direction: column; justify-content: center; min-height: 72px; }
         
-        .class-card.g1 { border-top: 3px solid var(--grade1-text); }
-        .class-card.g2 { border-top: 3px solid var(--grade2-text); }
-        .class-card.g3 { border-top: 3px solid var(--grade3-text); }
-        .class-card.empty { border-top-color: transparent; opacity: 0.5; background: transparent; border: 1px dashed var(--border); }
+        .class-card.g1 { border-left: 3px solid var(--g1-stroke); }
+        .class-card.g2 { border-left: 3px solid var(--g2-stroke); }
+        .class-card.g3 { border-left: 3px solid var(--g3-stroke); }
+        .class-card.empty { opacity: 0.35; background: transparent; border: 1px dashed var(--border-primary); }
         
-        .card-meta { font-size: 12px; color: var(--text-muted); margin-bottom: 2px; }
-        .card-subject { font-size: 14px; font-weight: 700; color: var(--text-main); margin-bottom: 8px; }
+        .card-meta { font-size: 10px; color: var(--text-muted); font-weight: 600; margin-bottom: 2px; }
+        .card-subject { font-size: 12px; font-weight: 800; color: var(--text-primary); margin-bottom: 6px; }
         
-        .teacher-box { display: flex; gap: 4px; justify-content: center; margin-top: auto; }
-        .teacher-name { background: var(--bg-body); font-size: 12px; padding: 4px 8px; border-radius: 4px; font-weight: 500; border: 1px solid var(--border-light); flex: 1; }
-        .teacher-name.error { background: #fee2e2; color: #ef4444; border-color: #fca5a5; }
+        .teacher-box { display: flex; gap: 3px; justify-content: center; margin-top: auto; }
+        .teacher-name { background: var(--border-muted); font-size: 10px; padding: 2px 4px; border-radius: 3px; font-weight: 600; border: 1px solid var(--border-primary); flex: 1; color: var(--text-secondary); }
+        .teacher-name.error { background: #fff1f2; color: #e11d48; border-color: #fecdd3; }
 
-        .hallway-zone { width: 100px; flex-shrink: 0; border: 1px dashed var(--border); border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--bg-surface); padding: 8px; }
-        .hallway-zone.active { border: 1px solid var(--primary); background: #eff6ff; }
-        .hw-label { font-size: 11px; color: var(--primary); font-weight: 600; margin-bottom: 4px; }
-        .hw-teacher { font-size: 13px; font-weight: 700; color: var(--text-main); }
-        .hw-error { font-size: 12px; color: #ef4444; font-weight: 600; }
+        .hallway-zone { width: 84px; flex-shrink: 0; border: 1px dashed var(--border-primary); border-radius: 5px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--bg-canvas); padding: 4px; }
+        .hallway-zone.active { border: 1px solid var(--hw-active-border); background: var(--hw-active-bg); }
+        .hw-label { font-size: 9px; color: var(--primary); font-weight: 800; margin-bottom: 1px; }
+        .hw-teacher { font-size: 11px; font-weight: 800; color: var(--text-primary); }
+        .hw-error { font-size: 10px; color: #e11d48; font-weight: 800; }
 
-        .spacer { width: 12px; flex-shrink: 0; border-right: 1px dashed var(--border); margin-right: 4px; }
+        .spacer { width: 6px; flex-shrink: 0; border-right: 1px dashed var(--border-primary); margin-right: 2px; }
 
-        .modal-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.3); backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; z-index: 200; opacity: 0; pointer-events: none; transition: opacity 0.15s ease-in-out; }
+        /* Clean Minimal Modal */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(9, 9, 11, 0.2); backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; z-index: 200; opacity: 0; pointer-events: none; transition: opacity 0.1s ease-in-out; }
         .modal-overlay.active { opacity: 1; pointer-events: auto; }
-        .modal-content { background: var(--bg-surface); padding: 24px; border-radius: 12px; width: 320px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); transform: scale(0.95); transition: transform 0.15s; }
+        .modal-content { background: var(--bg-canvas); padding: 20px; border-radius: 10px; width: 300px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05); transform: scale(0.98); transition: transform 0.1s ease; border: 1px solid var(--border-primary); }
         .modal-overlay.active .modal-content { transform: scale(1); }
-        .modal-title { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
-        .modal-input { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; margin-bottom: 20px; outline: none; transition: border-color 0.2s; }
-        .modal-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
+        .modal-title { font-size: 13px; font-weight: 700; margin-bottom: 10px; color: var(--text-primary); }
+        .modal-input { width: 100%; padding: 8px 10px; border: 1px solid var(--border-primary); border-radius: 5px; font-size: 12px; margin-bottom: 16px; outline: none; background: var(--bg-canvas); color: var(--text-primary); }
+        .modal-input:focus { border-color: var(--primary); }
         .modal-footer { display: flex; justify-content: space-between; }
+        .modal-footer .btn { width: auto; padding: 6px 12px; font-size: 12px; }
+
+        /* ------------------------------------------------------------------
+           [반응형 웹 디자인을 위한 미디어 쿼리 추가 영역]
+        ------------------------------------------------------------------ */
+        @media (max-width: 1024px) {
+            /* 2열 레이아웃을 1열 레이아웃으로 변경 */
+            .app-layout {
+                grid-template-columns: 1fr;
+                min-height: auto;
+            }
+
+            /* 조작 패널(Sidebar)을 화면 최상단으로 우선 배치하여 모바일 플로우 최적화 */
+            .control-panel {
+                position: relative;
+                height: auto;
+                border-left: none;
+                border-bottom: 1px solid var(--border-primary);
+                padding: 24px 20px;
+                order: -1; /* 최상단 배치 */
+            }
+
+            /* 시간표 수립 및 결과 영역 */
+            .workspace {
+                padding: 24px 16px;
+                gap: 24px;
+            }
+
+            /* 테이블 레이아웃 압착 방지를 위한 가로 스크롤 보장 */
+            .table-container {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch; /* 부드러운 스크롤 */
+            }
+            table {
+                min-width: 1000px; /* 열 개수가 많으므로 일정 너비를 유지 */
+            }
+
+            /* 결과 배치도 층별 구성 가로 스크롤 설정 */
+            .building {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                padding-bottom: 8px; /* 스크롤바 영역 확보 */
+            }
+            .floor-row {
+                min-width: 820px; /* 기존 형태의 완전한 구성을 유려하게 표현하기 위한 최소 폭 */
+            }
+        }
+
+        @media (max-width: 640px) {
+            /* 소형 모바일 최적화 */
+            .workspace-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 4px;
+            }
+            .section-desc {
+                text-align: left;
+            }
+            .settings-grid {
+                grid-template-columns: 1fr; /* 소형 기기에서 입력 영역 일렬 배치 */
+            }
+        }
     </style>
 </head>
 <body>
 
-    <header class="toolbar">
-        <div class="brand">
-            <svg class="brand-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-            ExamSync
-        </div>
-        <div class="toolbar-actions">
-            <span id="uploadStatus" class="status-text">명단 미등록</span>
-            <div class="file-upload-wrapper">
-                <button class="btn btn-outline">
-                    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"></path></svg>
-                    교사 명단 로드
+    <div class="app-layout">
+        
+        <!-- 좌측 작업 캔버스 및 출력 패널 -->
+        <main class="workspace">
+            
+            <!-- 시간표 수립 카드 -->
+            <section class="workspace-card">
+                <div class="workspace-header">
+                    <h2 class="section-title">
+                        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25a2.25 2.25 0 01-13.5 18v-2.25z"></path></svg>
+                        시험 일정 설계
+                    </h2>
+                    <span class="section-desc">가로로 문지르거나 드래그하여 시험 과목 정보를 입력하세요.</span>
+                </div>
+                
+                <div class="table-container">
+                    <div id="scheduleTableContainer"></div>
+                </div>
+            </section>
+
+            <!-- 배정 결과 대시보드 출력부 -->
+            <section id="mainOutput">
+                <div class="empty-state">
+                    <svg class="empty-icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"></path>
+                    </svg>
+                    <h3>대기 중인 결과가 없습니다</h3>
+                    <p>상단 패널의 절차에 따라 교사 명단을 업로드하고 배정 알고리즘을 가동하여 주십시오.</p>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- 우측 조작 및 상태 패널 -->
+        <aside class="control-panel">
+            
+            <div class="brand-deck">
+                <div class="brand-logo">
+                    <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"></path></svg>
+                </div>
+                <div class="brand-info">
+                    <h1>ExamSync</h1>
+                    <p>시험 감독 자동 배정 코어</p>
+                </div>
+            </div>
+
+            <!-- 시스템 세팅 (간소화 패널) -->
+            <div class="control-group">
+                <span class="control-label">시스템 설정</span>
+                <div class="settings-grid">
+                    <div class="settings-item">
+                        <label>시험 일수</label>
+                        <div class="number-stepper">
+                            <button onclick="changeDays(-1)">−</button>
+                            <input type="number" id="daysInput" value="2" readonly>
+                            <button onclick="changeDays(1)">+</button>
+                        </div>
+                    </div>
+                    <div class="settings-item">
+                        <label>최대 교시</label>
+                        <div class="number-stepper">
+                            <button onclick="changePeriods(-1)">−</button>
+                            <input type="number" id="periodsInput" value="3" readonly>
+                            <button onclick="changePeriods(1)">+</button>
+                        </div>
+                    </div>
+                </div>
+                <button class="btn btn-outline" onclick="toggleTheme()" style="margin-top: 4px; padding: 8px 12px; font-size: 12px;">
+                    <svg id="themeIcon" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z"></path></svg>
+                    <span id="themeToggleText">다크 테마 전환</span>
                 </button>
-                <input type="file" id="excelInput" class="file-upload-input" accept=".xlsx, .xls" />
             </div>
-            <button id="runBtn" class="btn btn-primary" onclick="runAssignment()" disabled>
-                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"></path></svg>
-                감독관 배치 실행
-            </button>
-        </div>
-    </header>
 
-    <main class="workspace">
-        <section>
-            <div class="section-title">
-                시험 시간표 캔버스
-                <span style="font-size: 13px; color: var(--text-muted); font-weight: 400; margin-left: 8px;">마우스를 가로로 드래그하여 범위를 지정하세요.</span>
+            <!-- 상태 HUD -->
+            <div class="hud-card">
+                <div class="hud-title">
+                    <span id="statusIndicator" class="status-dot"></span>
+                    ENGINE STATUS
+                </div>
+                <span id="uploadStatus" class="status-text" style="font-weight: 700; font-size: 13px;">교사 명단 미등록</span>
             </div>
-            <div class="table-container">
-                <div id="scheduleTableContainer"></div>
-            </div>
-        </section>
 
-        <section id="mainOutput"></section>
-    </main>
+            <!-- 설정 및 실행 제어 -->
+            <div class="control-group">
+                <span class="control-label">1. 교사 정보 입력</span>
+                <div class="file-upload-wrapper">
+                    <button class="btn btn-outline">
+                        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"></path></svg>
+                        교사 로스터 엑셀 로드
+                    </button>
+                    <input type="file" id="excelInput" class="file-upload-input" accept=".xlsx, .xls" />
+                </div>
+            </div>
+
+            <div class="control-group" style="margin-top: auto;">
+                <span class="control-label">2. 배정 프로세스 가동</span>
+                <button id="runBtn" class="btn btn-primary" onclick="runAssignment()" disabled>
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"></path></svg>
+                    배정 실행
+                </button>
+            </div>
+
+        </aside>
+
+    </div>
 
     <!-- 과목 입력 모달 -->
     <div class="modal-overlay" id="subjectModal">
         <div class="modal-content">
-            <div class="modal-title">과목 일괄 입력</div>
-            <input type="text" id="subjectInput" class="modal-input" placeholder="예: 국어 (빈칸 시 삭제)" autocomplete="off">
+            <div class="modal-title">시험 과목 설정</div>
+            <input type="text" id="subjectInput" class="modal-input" placeholder="과목 입력 (미기입 시 삭제)" autocomplete="off">
             <div class="modal-footer">
-                <button class="btn btn-outline" style="color:#ef4444;" onclick="saveSubject('')">지우기</button>
-                <div style="display: flex; gap: 8px;">
+                <button class="btn btn-outline" style="color:#e11d48; border-color: #fecdd3; background: #fff1f2;" onclick="saveSubject('')">삭제</button>
+                <div style="display: flex; gap: 6px;">
                     <button class="btn btn-outline" onclick="closeModal()">취소</button>
-                    <button class="btn btn-primary" onclick="saveSubject(document.getElementById('subjectInput').value)">적용</button>
+                    <button class="btn btn-primary" style="padding: 6px 14px;" onclick="saveSubject(document.getElementById('subjectInput').value)">적용</button>
                 </div>
             </div>
         </div>
@@ -174,8 +514,8 @@
 
     <script>
         const departments = ["1과", "2과", "3과", "4과"]; 
-        const maxDays = 2; 
-        const maxPeriods = 3; 
+        let maxDays = 2; 
+        let maxPeriods = 3; 
         let rawTeachers = [];
 
         let isDragging = false;
@@ -185,7 +525,7 @@
         // --- 1. 시간표 초기화 ---
         function initScheduleTable() {
             let html = `<table id="scheduleTable">`;
-            html += `<thead><tr><th rowspan="2" style="width: 50px;">일차</th><th rowspan="2" style="width: 50px;">교시</th>`;
+            html += `<thead><tr><th rowspan="2" style="width: 50px;">일차</th><th rowspan="2" style="width: 40px;">교시</th>`;
             html += `<th colspan="8" class="g1-header">1학년</th>`;
             html += `<th colspan="8" class="g2-header">2학년</th>`;
             html += `<th colspan="8" class="g3-header">3학년</th></tr><tr>`;
@@ -199,8 +539,8 @@
                 for(let p=1; p<=maxPeriods; p++) {
                     let periodName = `${d}일차 ${p}교시`;
                     html += `<tr data-period="${periodName}">`;
-                    if(p === 1) html += `<td rowspan="${maxPeriods}" style="font-weight:700; background:var(--bg-surface);">${d}일</td>`;
-                    html += `<td style="color:var(--text-muted); background:#f8fafc;">${p}</td>`;
+                    if(p === 1) html += `<td rowspan="${maxPeriods}" style="font-weight:700; background:var(--bg-canvas); color:var(--text-secondary);">${d}일</td>`;
+                    html += `<td style="color:var(--text-muted); background:var(--bg-app);">${p}</td>`;
                     
                     for(let g=1; g<=3; g++) {
                         for(let c=1; c<=8; c++) {
@@ -215,10 +555,11 @@
             attachDragEvents();
         }
 
-        // --- 2. 1차원 보간(Interpolation) 드래그 로직 ---
+        // --- 2. 1차원 보간(Interpolation) 드래그 및 모바일 터치 이벤트 바인딩 ---
         function attachDragEvents() {
             const table = document.getElementById('scheduleTable');
 
+            // 마우스 이벤트 바인딩
             table.addEventListener('mousedown', (e) => {
                 let cell = e.target.closest('.exam-cell');
                 if(cell) {
@@ -241,6 +582,48 @@
             });
 
             window.addEventListener('mouseup', () => {
+                if(isDragging) {
+                    isDragging = false;
+                    if(selectedCells.length > 0) openModal();
+                }
+            });
+
+            // [추가] 모바일 대응용 터치 제스처 이벤트 바인딩
+            table.addEventListener('touchstart', (e) => {
+                let touch = e.touches[0];
+                let target = document.elementFromPoint(touch.clientX, touch.clientY);
+                let cell = target ? target.closest('.exam-cell') : null;
+                
+                if(cell) {
+                    // 터치 조작 시 브라우저 스크롤 바운스가 일어나는 것을 미연에 방지
+                    e.preventDefault();
+                    isDragging = true;
+                    const rowEle = cell.closest('tr');
+                    const allCells = Array.from(rowEle.querySelectorAll('.exam-cell'));
+                    dragStartInfo = {
+                        rowEle: rowEle,
+                        startX: allCells.indexOf(cell),
+                        allCells: allCells
+                    };
+                    updateSelection(cell);
+                }
+            }, { passive: false });
+
+            table.addEventListener('touchmove', (e) => {
+                if(!isDragging) return;
+                e.preventDefault(); // 스크롤 무력화
+                
+                let touch = e.touches[0];
+                let target = document.elementFromPoint(touch.clientX, touch.clientY);
+                let cell = target ? target.closest('.exam-cell') : null;
+                
+                // 동일한 줄(Row) 범위 내에서 드래그 움직임 처리
+                if(cell && dragStartInfo && cell.closest('tr') === dragStartInfo.rowEle) {
+                    updateSelection(cell);
+                }
+            }, { passive: false });
+
+            window.addEventListener('touchend', () => {
                 if(isDragging) {
                     isDragging = false;
                     if(selectedCells.length > 0) openModal();
@@ -317,6 +700,7 @@
             input.focus();
         }
 
+        // --- 4. 셀 병합 및 분할 저장 ---
         function closeModal() {
             document.getElementById('subjectModal').classList.remove('active');
             document.querySelectorAll('.exam-cell.selected').forEach(el => {
@@ -334,14 +718,12 @@
             if (e.key === 'Enter') saveSubject(this.value);
         });
 
-        // --- 4. 🌟 버그가 수정된 핵심 로직: 셀 병합 및 분할 저장 ---
         function saveSubject(subjectValue) {
             let cleanSubject = subjectValue.trim();
             let targetRow = dragStartInfo.rowEle;
             
             let affectedCellsInfo = [];
             
-            // 💡 버그 수정: data-classes(병합배열)을 읽지 않고, 각각의 물리적 셀이 가진 고유 data-class만 1개씩 읽어옵니다.
             selectedCells.forEach(cell => {
                 let g = cell.getAttribute('data-grade');
                 let c = parseInt(cell.getAttribute('data-class'));
@@ -369,7 +751,6 @@
                 });
 
                 for (let g in groupedByGrade) {
-                    // 💡 안전장치: Set을 통해 반 번호 중복을 원천 차단하여 셀 뻥튀기 방지
                     let classes = [...new Set(groupedByGrade[g])].sort((a,b) => a - b);
                     let targetCells = classes.map(c => targetRow.querySelector(`.exam-cell[data-grade="${g}"][data-class="${c}"]`));
                     
@@ -435,16 +816,25 @@
                 rawTeachers = jsonData.map(t => {
                     let cleanObj = {};
                     for (let key in t) cleanObj[key.trim()] = t[key];
+                    
+                    // 이름 결측치 예외 처리
+                    let name = cleanObj["성명"] !== undefined && cleanObj["성명"] !== null ? String(cleanObj["성명"]).trim() : "";
+                    
+                    // 학년/반 파싱 시 NaN 예외 처리 방어 코드
+                    let gradeParsed = cleanObj["담당학년"] ? parseInt(String(cleanObj["담당학년"]).replace(/[^0-9]/g, '')) : null;
+                    let classParsed = cleanObj["담당반"] ? parseInt(String(cleanObj["담당반"]).replace(/[^0-9]/g, '')) : null;
+
                     return {
                         연번: cleanObj["연번"],
-                        성명: String(cleanObj["성명"]).trim(),
+                        성명: name,
                         과목: String(cleanObj["과목"] || ""),
-                        담당학년: cleanObj["담당학년"] ? parseInt(String(cleanObj["담당학년"]).replace(/[^0-9]/g, '')) : null,
-                        담당반: cleanObj["담당반"] ? parseInt(String(cleanObj["담당반"]).replace(/[^0-9]/g, '')) : null
+                        담당학년: isNaN(gradeParsed) ? null : gradeParsed,
+                        담당반: isNaN(classParsed) ? null : classParsed
                     };
-                });
+                }).filter(t => t.성명 !== ""); // 이름이 비어 있는 정체불명의 더미 행 필터링
                 
-                document.getElementById('uploadStatus').innerHTML = `<span style="color:#16a34a;">✔ 교사 ${rawTeachers.length}명 로드됨</span>`;
+                document.getElementById('statusIndicator').className = "status-dot active";
+                document.getElementById('uploadStatus').innerHTML = `로스터 로드됨 (${rawTeachers.length}명)`;
                 document.getElementById('runBtn').disabled = false;
             };
             reader.readAsArrayBuffer(file);
@@ -455,7 +845,7 @@
             const currentScheduleData = buildScheduleData();
             
             if(currentScheduleData.length === 0) {
-                alert("입력된 시험 과목이 없습니다. 시간표 캔버스에 과목을 구성해주세요.");
+                alert("일정 영역에 시험 과목이 정의되어 있지 않습니다.");
                 return;
             }
 
@@ -467,9 +857,11 @@
                 let activeSubjects = new Set();
                 period.exams.forEach(ex => activeSubjects.add(ex.subject));
 
+                // 과목명 정확히 일치 비교
                 let availablePool = teachers.filter(t => {
+                    let teacherSubjects = String(t.과목 || "").split(',').map(s => s.trim());
                     for (let examSubj of activeSubjects) {
-                        if (t.과목.includes(examSubj)) return false; 
+                        if (teacherSubjects.includes(examSubj)) return false; 
                     }
                     return true;
                 });
@@ -482,15 +874,20 @@
                         }
                         if (!subject) continue; 
 
+                        // 일관성 있는 랜덤 가중치 미리 할당
+                        availablePool.forEach(t => t.rand = Math.random());
                         availablePool.sort((a, b) => {
-                            if (a.totalCount === b.totalCount) return Math.random() - 0.5;
+                            if (a.totalCount === b.totalCount) return a.rand - b.rand;
                             return a.totalCount - b.totalCount;
                         });
 
                         let roomTeachers = [];
                         for (let i = 0; i < availablePool.length; i++) {
                             let candidate = availablePool[i];
-                            if (String(candidate.담당학년) === String(g) && String(candidate.담당반) === String(c)) continue; 
+                            
+                            let candGrade = candidate.담당학년 !== null ? String(candidate.담당학년) : "";
+                            let candClass = candidate.담당반 !== null ? String(candidate.담당반) : "";
+                            if (candGrade === String(g) && candClass === String(c)) continue; 
 
                             roomTeachers.push(candidate);
                             candidate.totalCount += 1; 
@@ -514,8 +911,10 @@
                     }
 
                     if (hasExamOnFloor) {
+                        // 복도 배정용 풀 역시 안전한 랜덤 가중치 부여 후 정렬
+                        availablePool.forEach(t => t.rand = Math.random());
                         availablePool.sort((a, b) => {
-                            if (a.totalCount === b.totalCount) return Math.random() - 0.5;
+                            if (a.totalCount === b.totalCount) return a.rand - b.rand;
                             return a.totalCount - b.totalCount;
                         });
 
@@ -585,11 +984,11 @@
                     const hwTeacher = period.hallway[row];
                     
                     if (hwTeacher === "NO_EXAM") {
-                        hwZone.innerHTML = `<span style="color:var(--text-muted); font-size:12px;">시험없음</span>`;
+                        hwZone.innerHTML = `<span style="color:var(--text-muted); font-size:10px;">미시행</span>`;
                     } else if (hwTeacher === "SHORTAGE") {
                         hwZone.classList.add('active');
-                        hwZone.style.borderColor = '#ef4444';
-                        hwZone.style.background = '#fee2e2';
+                        hwZone.style.borderColor = '#fecdd3';
+                        hwZone.style.background = '#fff1f2';
                         hwZone.innerHTML = `<div class="hw-error">인원 부족</div>`;
                     } else if (hwTeacher) {
                         hwZone.classList.add('active');
@@ -628,9 +1027,9 @@
                     html += `<div class="teacher-name">${roomData.teachers[1].성명}</div>`;
                 } else if (roomData.teachers.length === 1) {
                     html += `<div class="teacher-name">${roomData.teachers[0].성명}</div>`;
-                    html += `<div class="teacher-name error">부족</div>`;
+                    html += `<div class="teacher-name error">공석</div>`;
                 } else {
-                    html += `<div class="teacher-name error" style="flex:1;">배정 실패</div>`;
+                    html += `<div class="teacher-name error" style="flex:1;">배정오류</div>`;
                 }
                 html += `</div>`;
                 card.innerHTML = html;
@@ -639,6 +1038,58 @@
                 card.innerHTML = `<div class="card-meta" style="margin:auto 0;">${grade}-${classNum}</div>`;
             }
             return card;
+        }
+
+        // --- 9. 세팅 및 테마 제어 로직 ---
+        function hasAnySubject() {
+            return document.querySelectorAll('.exam-cell.has-subject').length > 0;
+        }
+
+        function changeDays(val) {
+            const input = document.getElementById('daysInput');
+            let current = parseInt(input.value);
+            let next = current + val;
+            if (next < 1 || next > 10) return;
+            
+            if (hasAnySubject()) {
+                if (!confirm("시험 일수를 변경하면 현재 작성 중인 일정 데이터가 초기화됩니다. 계속하시겠습니까?")) return;
+            }
+            
+            maxDays = next;
+            input.value = next;
+            initScheduleTable();
+        }
+
+        function changePeriods(val) {
+            const input = document.getElementById('periodsInput');
+            let current = parseInt(input.value);
+            let next = current + val;
+            if (next < 1 || next > 10) return;
+            
+            if (hasAnySubject()) {
+                if (!confirm("최대 교시를 변경하면 현재 작성 중인 일정 데이터가 초기화됩니다. 계속하시겠습니까?")) return;
+            }
+            
+            maxPeriods = next;
+            input.value = next;
+            initScheduleTable();
+        }
+
+        function toggleTheme() {
+            const body = document.body;
+            const text = document.getElementById('themeToggleText');
+            const icon = document.getElementById('themeIcon');
+            
+            body.classList.toggle('dark-theme');
+            const isDark = body.classList.contains('dark-theme');
+            
+            if (isDark) {
+                text.textContent = "라이트 테마 전환";
+                icon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.223l-1.591 1.591M5.25 12H3m4.223-4.773L5.632 5.632M12 7.5a4.5 4.5 0 100 9 4.5 4.5 0 000-9z"></path>`;
+            } else {
+                text.textContent = "다크 테마 전환";
+                icon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z"></path>`;
+            }
         }
 
         initScheduleTable();
