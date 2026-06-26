@@ -3,98 +3,548 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>맞춤형 시험 감독 배치 시스템 (인터랙티브 시간표)</title>
+    <title>gamdog | Scheduler Engine</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.8/dist/web/static/pretendard.css" />
     <style>
-        body { font-family: 'Malgun Gothic', sans-serif; padding: 20px; background-color: #f0f2f5; }
-        .panel { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        h2 { margin-top: 0; color: #333; }
-        button { padding: 10px 20px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: bold; margin-top: 10px; }
-        button:hover { background-color: #0056b3; }
+        :root {
+            --bg-app: #f5f5f4;       /* 스타크 화이트를 배제한, 눈이 편안한 웜그레이 (Stone 100) */
+            --bg-canvas: #fafaf9;    /* 강한 반사광을 차단한 크림 오프화이트 (Stone 50) */
+            --text-primary: #1c1917;  /* 부드러운 딥 브라운 그레이 (Stone 900) */
+            --text-secondary: #44403c;/* Stone 700 */
+            --text-muted: #78716c;    /* Stone 500 */
+            --border-primary: #e7e5e4;/* 경계선을 차분하게 감싸주는 소프트 샌드보더 (Stone 200) */
+            --border-muted: #f5f5f4;  /* 내부 요소를 구분하는 보조 라인 (Stone 100) */
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            
+            --g1-tint: #eff6ff; --g1-stroke: #3b82f6; --g1-text: #1d4ed8;
+            --g2-tint: #f0fdf4; --g2-stroke: #10b981; --g2-text: #047857;
+            --g3-tint: #fff1f2; --g3-stroke: #f43f5e; --g3-text: #be185d;
+            
+            --hw-active-bg: #f5f3ff;
+            --hw-active-border: #c7d2fe;
+        }
 
-        /* 시간표 입력기 스타일 */
-        .schedule-table { width: 100%; border-collapse: collapse; margin-top: 15px; user-select: none; /* 드래그 시 텍스트 선택 방지 */ }
-        .schedule-table th, .schedule-table td { border: 1px solid #ccc; padding: 8px; text-align: center; }
-        .schedule-table th { background-color: #f8f9fa; }
-        .grade-header { font-size: 16px; font-weight: bold; }
-        .grade-1 { background-color: #e3f2fd; }
-        .grade-2 { background-color: #e8f5e9; }
-        .grade-3 { background-color: #fce4ec; }
+        body.dark-theme {
+            --bg-app: #09090b;
+            --bg-canvas: #18181b;
+            --text-primary: #fafafa;
+            --text-secondary: #e4e4e7;
+            --text-muted: #a1a1aa;
+            --border-primary: #27272a;
+            --border-muted: #18181b;
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            
+            --g1-tint: rgba(59, 130, 246, 0.15); --g1-stroke: #3b82f6; --g1-text: #60a5fa;
+            --g2-tint: rgba(16, 185, 129, 0.15); --g2-stroke: #10b981; --g2-text: #34d399;
+            --g3-tint: rgba(244, 63, 94, 0.15);  --g3-stroke: #f43f5e; --g3-text: #fb7185;
+
+            --hw-active-bg: rgba(99, 102, 241, 0.15);
+            --hw-active-border: rgba(99, 102, 241, 0.4);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif; 
+            background-color: var(--bg-app); 
+            color: var(--text-primary); 
+            line-height: 1.4; 
+            -webkit-font-smoothing: antialiased;
+            transition: background-color 0.2s, color 0.2s;
+        }
+
+        /* App Layout Grid */
+        .app-layout {
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            min-height: 100vh;
+        }
+
+        /* Left Workspace (Canvas / Results) */
+        .workspace {
+            padding: 40px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 32px;
+            background-color: var(--bg-app);
+            background-image: radial-gradient(var(--border-primary) 1px, transparent 1px);
+            background-size: 24px 24px;
+        }
+
+        .workspace-card {
+            background: var(--bg-canvas);
+            border: 1px solid var(--border-primary);
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.02);
+        }
+
+        .workspace-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            gap: 12px;
+        }
+
+        .section-title {
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: -0.01em;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+        .section-desc {
+            font-size: 12px;
+            color: var(--text-muted);
+            font-weight: 400;
+            text-align: right;
+        }
+
+        /* Sophisticated Time Table */
+        .table-container {
+            border: 1px solid var(--border-primary);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        table { width: 100%; border-collapse: collapse; user-select: none; table-layout: fixed; background-color: var(--bg-canvas); }
+        th, td { border: 1px solid var(--border-primary); padding: 0; text-align: center; font-size: 12px; height: 38px; }
+        th { background: var(--bg-app); font-weight: 600; color: var(--text-muted); font-size: 11px; letter-spacing: -0.01em; }
         
-        /* 시간표 셀(Cell) 인터랙션 */
-        .exam-cell { cursor: pointer; transition: background-color 0.1s; height: 35px; font-weight: bold; color: #333; }
-        .exam-cell.selected { background-color: #ffeeba !important; border: 2px solid #ffc107; }
-        .exam-cell.has-subject { background-color: #d1ecf1; border-color: #bee5eb; }
+        .g1-header { border-bottom: 2px solid var(--g1-stroke); color: var(--g1-text); font-weight: 700; }
+        .g2-header { border-bottom: 2px solid var(--g2-stroke); color: var(--g2-text); font-weight: 700; }
+        .g3-header { border-bottom: 2px solid var(--g3-stroke); color: var(--g3-text); font-weight: 700; }
 
-        /* 결과 출력 화면 스타일 (기존 유지) */
-        .period-container { margin-bottom: 50px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .period-title { font-size: 24px; color: #333; border-bottom: 3px solid #007bff; padding-bottom: 10px; margin-bottom: 20px; }
-        .building-container { display: flex; flex-direction: column; gap: 15px; }
-        .floor { display: grid; grid-template-columns: 80px 1fr 1fr 20px 1fr 1fr 20px 1fr 1fr 20px 100px; gap: 10px; background: #e9ecef; padding: 15px; border-radius: 8px; align-items: stretch; }
-        .dept-label { display: flex; align-items: center; justify-content: center; background: #6c757d; color: white; font-weight: bold; border-radius: 8px; text-align: center; padding: 5px; }
-        .spacer { width: 20px; }
-        .classroom { background: white; border: 2px solid #ccc; border-radius: 8px; padding: 10px; text-align: center; display: flex; flex-direction: column; justify-content: center; }
-        .grade-box-1 { border-color: #4facfe; } .grade-box-2 { border-color: #43e97b; } .grade-box-3 { border-color: #fa709a; }
-        .class-title { font-size: 16px; font-weight: bold; margin-bottom: 5px; }
-        .exam-subject { color: #dc3545; font-weight: bold; margin-bottom: 8px; font-size: 15px; }
-        .teacher-info { font-size: 13px; background: #f1f3f5; margin: 2px 0; padding: 4px; border-radius: 4px; }
-        .error-text { color: red; font-weight: bold; }
-        .hallway-card { background: #fff3cd; border: 2px dashed #ffc107; border-radius: 8px; padding: 10px; text-align: center; display: flex; flex-direction: column; justify-content: center; }
+        .exam-cell { cursor: crosshair; transition: all 0.1s ease; position: relative; color: var(--text-secondary); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .exam-cell:hover { background: var(--border-muted); }
+
+        /* Grade-specific styling */
+        .exam-cell.has-subject[data-grade="1"] {
+            background: var(--g1-tint) !important;
+            color: var(--g1-text);
+            box-shadow: inset 3px 0 0 0 var(--g1-stroke);
+            font-weight: 700;
+            font-size: 11px;
+        }
+        .exam-cell.has-subject[data-grade="2"] {
+            background: var(--g2-tint) !important;
+            color: var(--g2-text);
+            box-shadow: inset 3px 0 0 0 var(--g2-stroke);
+            font-weight: 700;
+            font-size: 11px;
+        }
+        .exam-cell.has-subject[data-grade="3"] {
+            background: var(--g3-tint) !important;
+            color: var(--g3-text);
+            box-shadow: inset 3px 0 0 0 var(--g3-stroke);
+            font-weight: 700;
+            font-size: 11px;
+        }
+
+        /* Dynamic Selector Highlighting */
+        .exam-cell.selected { background: rgba(79, 70, 229, 0.08) !important; color: var(--primary); }
+        .exam-cell.sel-single { box-shadow: inset 0 0 0 1.5px var(--primary); }
+        .exam-cell.sel-left { box-shadow: inset 1.5px 0 0 0 var(--primary), inset 0 1.5px 0 0 var(--primary), inset 0 -1.5px 0 0 var(--primary); }
+        .exam-cell.sel-mid { box-shadow: inset 0 1.5px 0 0 var(--primary), inset 0 -1.5px 0 0 var(--primary); }
+        .exam-cell.sel-right { box-shadow: inset -1.5px 0 0 0 var(--primary), inset 0 1.5px 0 0 var(--primary), inset 0 -1.5px 0 0 var(--primary); }
+
+        /* Right Control Column (Sidebar Panel) */
+        .control-panel {
+            background-color: var(--bg-canvas);
+            border-left: 1px solid var(--border-primary);
+            padding: 32px 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        .brand-deck {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border-muted);
+        }
+        .brand-logo {
+            width: 32px;
+            height: 32px;
+            background-color: var(--primary);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+        .brand-logo svg { width: 18px; height: 18px; }
+        .brand-info h1 { font-size: 15px; font-weight: 800; letter-spacing: -0.03em; color: var(--text-primary); }
+        .brand-info p { font-size: 11px; color: var(--text-muted); }
+
+        .hud-card {
+            background: var(--bg-app);
+            border: 1px solid var(--border-primary);
+            border-radius: 8px;
+            padding: 18px;
+        }
+        .hud-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 12px; display: flex; align-items: center; gap: 6px;}
+        .status-dot { width: 6px; height: 6px; background-color: #d4d4d8; border-radius: 50%; display: inline-block; transition: background-color 0.2s; }
+        .status-dot.active { background-color: #10b981; box-shadow: 0 0 8px #10b981; }
+
+        .control-group { display: flex; flex-direction: column; gap: 10px; }
+        .control-label { font-size: 11px; font-weight: 600; color: var(--text-secondary); }
+
+        /* Setting Steppers */
+        .settings-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        .settings-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .settings-item label {
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+        .number-stepper {
+            display: flex;
+            align-items: center;
+            border: 1px solid var(--border-primary);
+            border-radius: 6px;
+            overflow: hidden;
+            background: var(--bg-canvas);
+        }
+        .number-stepper button {
+            background: none;
+            border: none;
+            width: 28px;
+            height: 28px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: background 0.1s;
+        }
+        .number-stepper button:hover {
+            background: var(--border-muted);
+        }
+        .number-stepper input {
+            width: 100%;
+            border: none;
+            text-align: center;
+            font-size: 12px;
+            font-weight: 700;
+            background: none;
+            color: var(--text-primary);
+            pointer-events: none;
+        }
+
+        /* Figma Style Custom File Button */
+        .file-upload-wrapper { position: relative; width: 100%; }
+        .file-upload-input { position: absolute; left: 0; top: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+        
+        .btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+            width: 100%; padding: 10px 16px; border-radius: 6px; font-size: 13px; font-weight: 600;
+            border: 1px solid transparent; cursor: pointer; transition: all 0.15s ease;
+            letter-spacing: -0.01em;
+        }
+        .btn-outline { background: var(--bg-canvas); border-color: var(--border-primary); color: var(--text-primary); box-shadow: 0 1px 2px rgba(0,0,0,0.02); }
+        .btn-outline:hover { background: var(--border-muted); border-color: #cbd5e1; }
+        .btn-primary { background: var(--text-primary); color: var(--bg-canvas); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .btn-primary:hover { background: var(--text-secondary); }
+        .btn-primary:disabled { background: var(--border-primary); color: var(--text-muted); cursor: not-allowed; box-shadow: none; }
+
+        /* Output Design Overhaul */
+        .empty-state {
+            padding: 60px 20px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
+        }
+        .empty-icon {
+            width: 48px; height: 48px;
+            color: #d4d4d8; margin-bottom: 16px;
+        }
+        .empty-state h3 { font-size: 13px; font-weight: 700; color: var(--text-secondary); margin-bottom: 4px; }
+        .empty-state p { font-size: 11px; max-width: 260px; line-height: 1.5; }
+
+        .period-block { background: var(--bg-canvas); border: 1px solid var(--border-primary); border-radius: 12px; padding: 24px; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.02); margin-bottom: 20px; }
+        .period-block:last-child { margin-bottom: 0; }
+        .period-header { font-size: 14px; font-weight: 800; color: var(--text-primary); margin-bottom: 18px; padding-bottom: 10px; border-bottom: 1px solid var(--border-muted); letter-spacing: -0.01em; }
+        
+        .building { display: flex; flex-direction: column; gap: 10px; }
+        .floor-row { display: flex; align-items: stretch; gap: 8px; background: var(--bg-app); padding: 8px; border-radius: 8px; border: 1px solid var(--border-muted); }
+        
+        .dept-label { width: 52px; display: flex; align-items: center; justify-content: center; background: var(--text-primary); color: var(--bg-canvas); font-weight: 800; border-radius: 5px; font-size: 11px; flex-shrink: 0; }
+
+        .class-group { display: flex; gap: 6px; flex: 1; }
+        .class-card { flex: 1; background: var(--bg-canvas); border: 1px solid var(--border-primary); border-radius: 6px; padding: 8px; text-align: center; display: flex; flex-direction: column; justify-content: center; min-height: 72px; }
+        
+        .class-card.g1 { border-left: 3px solid var(--g1-stroke); }
+        .class-card.g2 { border-left: 3px solid var(--g2-stroke); }
+        .class-card.g3 { border-left: 3px solid var(--g3-stroke); }
+        .class-card.empty { opacity: 0.35; background: transparent; border: 1px dashed var(--border-primary); }
+        
+        .card-meta { font-size: 10px; color: var(--text-muted); font-weight: 600; margin-bottom: 2px; }
+        .card-subject { font-size: 12px; font-weight: 800; color: var(--text-primary); margin-bottom: 6px; }
+        
+        .teacher-box { display: flex; gap: 3px; justify-content: center; margin-top: auto; }
+        .teacher-name { background: var(--border-muted); font-size: 10px; padding: 2px 4px; border-radius: 3px; font-weight: 600; border: 1px solid var(--border-primary); flex: 1; color: var(--text-secondary); }
+        .teacher-name.error { background: #fff1f2; color: #e11d48; border-color: #fecdd3; }
+
+        .hallway-zone { width: 84px; flex-shrink: 0; border: 1px dashed var(--border-primary); border-radius: 5px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--bg-canvas); padding: 4px; }
+        .hallway-zone.active { border: 1px solid var(--hw-active-border); background: var(--hw-active-bg); }
+        .hw-label { font-size: 9px; color: var(--primary); font-weight: 800; margin-bottom: 1px; }
+        .hw-teacher { font-size: 11px; font-weight: 800; color: var(--text-primary); }
+        .hw-error { font-size: 10px; color: #e11d48; font-weight: 800; }
+
+        .spacer { width: 6px; flex-shrink: 0; border-right: 1px dashed var(--border-primary); margin-right: 2px; }
+
+        /* Clean Minimal Modal */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(9, 9, 11, 0.2); backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; z-index: 200; opacity: 0; pointer-events: none; transition: opacity 0.1s ease-in-out; }
+        .modal-overlay.active { opacity: 1; pointer-events: auto; }
+        .modal-content { background: var(--bg-canvas); padding: 20px; border-radius: 10px; width: 300px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05); transform: scale(0.98); transition: transform 0.1s ease; border: 1px solid var(--border-primary); }
+        .modal-overlay.active .modal-content { transform: scale(1); }
+        .modal-title { font-size: 13px; font-weight: 700; margin-bottom: 10px; color: var(--text-primary); }
+        .modal-input { width: 100%; padding: 8px 10px; border: 1px solid var(--border-primary); border-radius: 5px; font-size: 12px; margin-bottom: 16px; outline: none; background: var(--bg-canvas); color: var(--text-primary); }
+        .modal-input:focus { border-color: var(--primary); }
+        .modal-footer { display: flex; justify-content: space-between; }
+        .modal-footer .btn { width: auto; padding: 6px 12px; font-size: 12px; }
+
+        /* ------------------------------------------------------------------
+           [반응형 웹 디자인을 위한 미디어 쿼리 추가 영역]
+        ------------------------------------------------------------------ */
+        @media (max-width: 1024px) {
+            /* 2열 레이아웃을 1열 레이아웃으로 변경 */
+            .app-layout {
+                grid-template-columns: 1fr;
+                min-height: auto;
+            }
+
+            /* 조작 패널(Sidebar)을 화면 최상단으로 우선 배치하여 모바일 플로우 최적화 */
+            .control-panel {
+                position: relative;
+                height: auto;
+                border-left: none;
+                border-bottom: 1px solid var(--border-primary);
+                padding: 24px 20px;
+                order: -1; /* 최상단 배치 */
+            }
+
+            /* 시간표 수립 및 결과 영역 */
+            .workspace {
+                padding: 24px 16px;
+                gap: 24px;
+            }
+
+            /* 테이블 레이아웃 압착 방지를 위한 가로 스크롤 보장 */
+            .table-container {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch; /* 부드러운 스크롤 */
+            }
+            table {
+                min-width: 1000px; /* 열 개수가 많으므로 일정 너비를 유지 */
+            }
+
+            /* 결과 배치도 층별 구성 가로 스크롤 설정 */
+            .building {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                padding-bottom: 8px; /* 스크롤바 영역 확보 */
+            }
+            .floor-row {
+                min-width: 820px; /* 기존 형태의 완전한 구성을 유려하게 표현하기 위한 최소 폭 */
+            }
+        }
+
+        @media (max-width: 640px) {
+            /* 소형 모바일 최적화 */
+            .workspace-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 4px;
+            }
+            .section-desc {
+                text-align: left;
+            }
+            .settings-grid {
+                grid-template-columns: 1fr; /* 소형 기기에서 입력 영역 일렬 배치 */
+            }
+        }
     </style>
 </head>
 <body>
 
-    <div class="panel">
-        <h2>1단계: 교사 명단 엑셀 업로드</h2>
-        <input type="file" id="excelInput" accept=".xlsx, .xls" />
-        <span id="teacherCount" style="margin-left: 15px; color: #007bff;"></span>
+    <div class="app-layout">
+        
+        <!-- 좌측 작업 캔버스 및 출력 패널 -->
+        <main class="workspace">
+            
+            <!-- 시간표 수립 카드 -->
+            <section class="workspace-card">
+                <div class="workspace-header">
+                    <h2 class="section-title">
+                        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25a2.25 2.25 0 01-13.5 18v-2.25z"></path></svg>
+                        시험 일정 설계
+                    </h2>
+                    <span class="section-desc">가로로 문지르거나 드래그하여 시험 과목 정보를 입력하세요.</span>
+                </div>
+                
+                <div class="table-container">
+                    <div id="scheduleTableContainer"></div>
+                </div>
+            </section>
+
+            <!-- 배정 결과 대시보드 출력부 -->
+            <section id="mainOutput">
+                <div class="empty-state">
+                    <svg class="empty-icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"></path>
+                    </svg>
+                    <h3>대기 중인 결과가 없습니다</h3>
+                    <p>상단 패널의 절차에 따라 교사 명단을 업로드하고 배정 알고리즘을 가동하여 주십시오.</p>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- 우측 조작 및 상태 패널 -->
+        <aside class="control-panel">
+            
+            <div class="brand-deck">
+                <div class="brand-logo">
+                    <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"></path></svg>
+                </div>
+                <div class="brand-info">
+                    <h1>gamdog</h1>
+                    <p>시험 감독 자동 배정 코어</p>
+                </div>
+            </div>
+
+            <!-- 시스템 세팅 (간소화 패널) -->
+            <div class="control-group">
+                <span class="control-label">시스템 설정</span>
+                <div class="settings-grid">
+                    <div class="settings-item">
+                        <label>시험 일수</label>
+                        <div class="number-stepper">
+                            <button onclick="changeDays(-1)">−</button>
+                            <input type="number" id="daysInput" value="2" readonly>
+                            <button onclick="changeDays(1)">+</button>
+                        </div>
+                    </div>
+                    <div class="settings-item">
+                        <label>최대 교시</label>
+                        <div class="number-stepper">
+                            <button onclick="changePeriods(-1)">−</button>
+                            <input type="number" id="periodsInput" value="3" readonly>
+                            <button onclick="changePeriods(1)">+</button>
+                        </div>
+                    </div>
+                </div>
+                <button class="btn btn-outline" onclick="toggleTheme()" style="margin-top: 4px; padding: 8px 12px; font-size: 12px;">
+                    <svg id="themeIcon" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z"></path></svg>
+                    <span id="themeToggleText">다크 테마 전환</span>
+                </button>
+            </div>
+
+            <!-- 상태 HUD -->
+            <div class="hud-card">
+                <div class="hud-title">
+                    <span id="statusIndicator" class="status-dot"></span>
+                    ENGINE STATUS
+                </div>
+                <span id="uploadStatus" class="status-text" style="font-weight: 700; font-size: 13px;">교사 명단 미등록</span>
+            </div>
+
+            <!-- 설정 및 실행 제어 -->
+            <div class="control-group">
+                <span class="control-label">1. 교사 정보 입력</span>
+                <div class="file-upload-wrapper">
+                    <button class="btn btn-outline">
+                        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"></path></svg>
+                        교사 로스터 엑셀 로드
+                    </button>
+                    <input type="file" id="excelInput" class="file-upload-input" accept=".xlsx, .xls" />
+                </div>
+            </div>
+
+            <div class="control-group" style="margin-top: auto;">
+                <span class="control-label">2. 배정 프로세스 가동</span>
+                <button id="runBtn" class="btn btn-primary" onclick="runAssignment()" disabled>
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"></path></svg>
+                    배정 실행
+                </button>
+            </div>
+
+        </aside>
+
     </div>
 
-    <div class="panel">
-        <h2>2단계: 시험 시간표 입력 (마우스 드래그)</h2>
-        <p style="color: #555; font-size: 14px;">💡 <b>사용법:</b> 같은 과목을 보는 반들을 <b>마우스로 길게 드래그</b>한 뒤 마우스를 놓으면 과목을 입력할 수 있습니다. (과목을 지우려면 빈칸으로 입력)</p>
-        
-        <!-- 시간표가 그려질 영역 -->
-        <div id="scheduleTableContainer"></div>
-        
-        <button id="runBtn" onclick="runAssignment()" style="display:none; width: 100%; margin-top: 20px;">🚀 위 시간표대로 자동 배치 실행</button>
+    <!-- 과목 입력 모달 -->
+    <div class="modal-overlay" id="subjectModal">
+        <div class="modal-content">
+            <div class="modal-title">시험 과목 설정</div>
+            <input type="text" id="subjectInput" class="modal-input" placeholder="과목 입력 (미기입 시 삭제)" autocomplete="off">
+            <div class="modal-footer">
+                <button class="btn btn-outline" style="color:#e11d48; border-color: #fecdd3; background: #fff1f2;" onclick="saveSubject('')">삭제</button>
+                <div style="display: flex; gap: 6px;">
+                    <button class="btn btn-outline" onclick="closeModal()">취소</button>
+                    <button class="btn btn-primary" style="padding: 6px 14px;" onclick="saveSubject(document.getElementById('subjectInput').value)">적용</button>
+                </div>
+            </div>
+        </div>
     </div>
-
-    <div id="mainOutput"></div>
 
     <script>
-        // --- 환경 설정 ---
         const departments = ["1과", "2과", "3과", "4과"]; 
-        const maxDays = 2; // 표시할 일수 (기본 2일)
-        const maxPeriods = 3; // 하루당 교시 수 (기본 3교시)
+        let maxDays = 2; 
+        let maxPeriods = 3; 
         let rawTeachers = [];
 
-        // --- 1. 시간표 테이블 생성 및 드래그 로직 ---
+        let isDragging = false;
+        let selectedCells = [];
+        let dragStartInfo = null; 
+
+        // --- 1. 시간표 초기화 ---
         function initScheduleTable() {
-            let html = `<table class="schedule-table" id="scheduleTable">`;
-            
-            // 헤더 생성
-            html += `<thead><tr><th rowspan="2">일차</th><th rowspan="2">교시</th>`;
-            html += `<th colspan="8" class="grade-header grade-1">1학년</th>`;
-            html += `<th colspan="8" class="grade-header grade-2">2학년</th>`;
-            html += `<th colspan="8" class="grade-header grade-3">3학년</th></tr><tr>`;
+            let html = `<table id="scheduleTable">`;
+            html += `<thead><tr><th rowspan="2" style="width: 50px;">일차</th><th rowspan="2" style="width: 40px;">교시</th>`;
+            html += `<th colspan="8" class="g1-header">1학년</th>`;
+            html += `<th colspan="8" class="g2-header">2학년</th>`;
+            html += `<th colspan="8" class="g3-header">3학년</th></tr><tr>`;
             
             for(let g=1; g<=3; g++) {
                 for(let c=1; c<=8; c++) html += `<th>${c}반</th>`;
             }
             html += `</tr></thead><tbody>`;
 
-            // 행(Row) 생성
             for(let d=1; d<=maxDays; d++) {
                 for(let p=1; p<=maxPeriods; p++) {
                     let periodName = `${d}일차 ${p}교시`;
                     html += `<tr data-period="${periodName}">`;
-                    if(p === 1) html += `<td rowspan="${maxPeriods}"><strong>${d}일차</strong></td>`;
-                    html += `<td>${p}교시</td>`;
+                    if(p === 1) html += `<td rowspan="${maxPeriods}" style="font-weight:700; background:var(--bg-canvas); color:var(--text-secondary);">${d}일</td>`;
+                    html += `<td style="color:var(--text-muted); background:var(--bg-app);">${p}</td>`;
                     
                     for(let g=1; g<=3; g++) {
                         for(let c=1; c<=8; c++) {
-                            html += `<td class="exam-cell" data-grade="${g}" data-class="${c}"></td>`;
+                            html += `<td class="exam-cell" data-grade="${g}" data-class="${c}" data-classes="${c}"></td>`;
                         }
                     }
                     html += `</tr>`;
@@ -105,61 +555,254 @@
             attachDragEvents();
         }
 
-        // 마우스 드래그 이벤트 (블록 지정)
+        // --- 2. 1차원 보간(Interpolation) 드래그 및 모바일 터치 이벤트 바인딩 ---
         function attachDragEvents() {
-            let isDragging = false;
-            let selectedCells = [];
-            let startRowIndex = -1;
             const table = document.getElementById('scheduleTable');
 
+            // 마우스 이벤트 바인딩
             table.addEventListener('mousedown', (e) => {
-                if(e.target.classList.contains('exam-cell')) {
+                let cell = e.target.closest('.exam-cell');
+                if(cell) {
                     isDragging = true;
-                    document.querySelectorAll('.selected').forEach(el => el.classList.remove('selected'));
-                    selectedCells = [e.target];
-                    e.target.classList.add('selected');
-                    startRowIndex = e.target.parentElement.rowIndex; // 같은 줄(교시)만 선택되게 제한
+                    const rowEle = cell.closest('tr');
+                    const allCells = Array.from(rowEle.querySelectorAll('.exam-cell'));
+                    dragStartInfo = {
+                        rowEle: rowEle,
+                        startX: allCells.indexOf(cell),
+                        allCells: allCells
+                    };
+                    updateSelection(cell);
                 }
             });
 
             table.addEventListener('mouseover', (e) => {
-                if(isDragging && e.target.classList.contains('exam-cell')) {
-                    if(e.target.parentElement.rowIndex === startRowIndex && !selectedCells.includes(e.target)) {
-                        selectedCells.push(e.target);
-                        e.target.classList.add('selected');
-                    }
-                }
+                if(!isDragging) return;
+                let cell = e.target.closest('.exam-cell');
+                if(cell) updateSelection(cell);
             });
 
             window.addEventListener('mouseup', () => {
                 if(isDragging) {
                     isDragging = false;
-                    if(selectedCells.length > 0) {
-                        // 프롬프트 창 띄우기
-                        let subject = prompt("지정한 반들의 시험 과목을 입력하세요.\n(비워두거나 취소하면 지워집니다.)");
-                        if(subject !== null) {
-                            let cleanSubject = subject.trim();
-                            selectedCells.forEach(cell => {
-                                cell.innerText = cleanSubject;
-                                if(cleanSubject) {
-                                    cell.classList.add('has-subject');
-                                } else {
-                                    cell.classList.remove('has-subject');
-                                }
-                            });
-                        }
-                        // 선택 해제 효과
-                        selectedCells.forEach(c => c.classList.remove('selected'));
-                        selectedCells = [];
-                    }
+                    if(selectedCells.length > 0) openModal();
+                }
+            });
+
+            // [추가] 모바일 대응용 터치 제스처 이벤트 바인딩
+            table.addEventListener('touchstart', (e) => {
+                let touch = e.touches[0];
+                let target = document.elementFromPoint(touch.clientX, touch.clientY);
+                let cell = target ? target.closest('.exam-cell') : null;
+                
+                if(cell) {
+                    // 터치 조작 시 브라우저 스크롤 바운스가 일어나는 것을 미연에 방지
+                    e.preventDefault();
+                    isDragging = true;
+                    const rowEle = cell.closest('tr');
+                    const allCells = Array.from(rowEle.querySelectorAll('.exam-cell'));
+                    dragStartInfo = {
+                        rowEle: rowEle,
+                        startX: allCells.indexOf(cell),
+                        allCells: allCells
+                    };
+                    updateSelection(cell);
+                }
+            }, { passive: false });
+
+            table.addEventListener('touchmove', (e) => {
+                if(!isDragging) return;
+                e.preventDefault(); // 스크롤 무력화
+                
+                let touch = e.touches[0];
+                let target = document.elementFromPoint(touch.clientX, touch.clientY);
+                let cell = target ? target.closest('.exam-cell') : null;
+                
+                // 동일한 줄(Row) 범위 내에서 드래그 움직임 처리
+                if(cell && dragStartInfo && cell.closest('tr') === dragStartInfo.rowEle) {
+                    updateSelection(cell);
+                }
+            }, { passive: false });
+
+            window.addEventListener('touchend', () => {
+                if(isDragging) {
+                    isDragging = false;
+                    if(selectedCells.length > 0) openModal();
                 }
             });
         }
 
-        // 화면 켜질 때 표 생성
-        initScheduleTable();
+        function updateSelection(currentHoverCell) {
+            let currentRowCells = Array.from(currentHoverCell.closest('tr').querySelectorAll('.exam-cell'));
+            let currentX = currentRowCells.indexOf(currentHoverCell);
+            if (currentX === -1) return;
 
-        // --- 2. 엑셀 파일 읽기 (기존 동일) ---
+            const allCells = dragStartInfo.allCells;
+            let minX = Math.min(dragStartInfo.startX, currentX);
+            let maxX = Math.max(dragStartInfo.startX, currentX);
+
+            let expanded = true;
+            while(expanded) {
+                expanded = false;
+                for (let x = minX; x <= Math.min(maxX, allCells.length - 1); x++) {
+                    let c = allCells[x];
+                    if (c.style.display === 'none') {
+                        let repX = x;
+                        while(repX >= 0 && allCells[repX].style.display === 'none') repX--;
+                        if (repX >= 0 && repX < minX) {
+                            minX = repX;
+                            expanded = true;
+                        }
+                    } else {
+                        let classesLength = c.getAttribute('data-classes').split(',').length;
+                        if (classesLength > 1) {
+                            let cEndX = x + classesLength - 1;
+                            if (cEndX > maxX) {
+                                maxX = cEndX;
+                                expanded = true;
+                            }
+                        }
+                    }
+                }
+            }
+
+            document.querySelectorAll('.exam-cell.selected').forEach(el => {
+                el.classList.remove('selected', 'sel-left', 'sel-mid', 'sel-right', 'sel-single');
+            });
+            selectedCells = [];
+            let visibleCells = [];
+
+            for (let x = minX; x <= maxX; x++) {
+                let c = allCells[x];
+                selectedCells.push(c);
+                if (c.style.display !== 'none') {
+                    visibleCells.push(c);
+                }
+            }
+
+            if (visibleCells.length === 1) {
+                visibleCells[0].classList.add('selected', 'sel-single');
+            } else if (visibleCells.length > 1) {
+                visibleCells.forEach((c, idx) => {
+                    c.classList.add('selected');
+                    if (idx === 0) c.classList.add('sel-left');
+                    else if (idx === visibleCells.length - 1) c.classList.add('sel-right');
+                    else c.classList.add('sel-mid');
+                });
+            }
+        }
+
+        // --- 3. 모달 제어 ---
+        function openModal() {
+            const modal = document.getElementById('subjectModal');
+            const input = document.getElementById('subjectInput');
+            modal.classList.add('active');
+            input.value = '';
+            input.focus();
+        }
+
+        // --- 4. 셀 병합 및 분할 저장 ---
+        function closeModal() {
+            document.getElementById('subjectModal').classList.remove('active');
+            document.querySelectorAll('.exam-cell.selected').forEach(el => {
+                el.classList.remove('selected', 'sel-left', 'sel-mid', 'sel-right', 'sel-single');
+            });
+            selectedCells = [];
+            dragStartInfo = null;
+        }
+
+        document.getElementById('subjectModal').addEventListener('mousedown', function(e) {
+            if (e.target === this) closeModal();
+        });
+
+        document.getElementById('subjectInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') saveSubject(this.value);
+        });
+
+        function saveSubject(subjectValue) {
+            let cleanSubject = subjectValue.trim();
+            let targetRow = dragStartInfo.rowEle;
+            
+            let affectedCellsInfo = [];
+            
+            selectedCells.forEach(cell => {
+                let g = cell.getAttribute('data-grade');
+                let c = parseInt(cell.getAttribute('data-class'));
+                affectedCellsInfo.push({ grade: g, classNum: c });
+            });
+
+            // Split (기존 병합 해제)
+            affectedCellsInfo.forEach(info => {
+                let cell = targetRow.querySelector(`.exam-cell[data-grade="${info.grade}"][data-class="${info.classNum}"]`);
+                if(cell) {
+                    cell.style.display = ''; 
+                    cell.colSpan = 1;
+                    cell.innerText = '';
+                    cell.classList.remove('has-subject', 'selected', 'sel-left', 'sel-mid', 'sel-right', 'sel-single');
+                    cell.setAttribute('data-classes', info.classNum); 
+                }
+            });
+
+            // Merge (과목 입력 시 병합)
+            if (cleanSubject) {
+                let groupedByGrade = {};
+                affectedCellsInfo.forEach(info => {
+                    if(!groupedByGrade[info.grade]) groupedByGrade[info.grade] = [];
+                    groupedByGrade[info.grade].push(info.classNum);
+                });
+
+                for (let g in groupedByGrade) {
+                    let classes = [...new Set(groupedByGrade[g])].sort((a,b) => a - b);
+                    let targetCells = classes.map(c => targetRow.querySelector(`.exam-cell[data-grade="${g}"][data-class="${c}"]`));
+                    
+                    let firstCell = targetCells[0];
+                    firstCell.colSpan = targetCells.length;
+                    firstCell.innerText = cleanSubject;
+                    firstCell.classList.add('has-subject');
+                    firstCell.setAttribute('data-classes', classes.join(','));
+
+                    for (let i = 1; i < targetCells.length; i++) {
+                        targetCells[i].style.display = 'none';
+                    }
+                }
+            }
+
+            closeModal();
+        }
+
+        // --- 5. 데이터 추출 ---
+        function buildScheduleData() {
+            let scheduleData = [];
+            const rows = document.querySelectorAll('#scheduleTable tbody tr');
+            
+            rows.forEach(row => {
+                let periodName = row.getAttribute('data-period');
+                let periodExams = [];
+                let subjectMap = {}; 
+
+                const cells = row.querySelectorAll('.exam-cell.has-subject');
+                cells.forEach(cell => {
+                    if (cell.style.display !== 'none') {
+                        let subject = cell.innerText.trim();
+                        let grade = parseInt(cell.getAttribute('data-grade'));
+                        let classes = cell.getAttribute('data-classes').split(',').map(Number); 
+                        
+                        let key = `${grade}_${subject}`;
+                        if(!subjectMap[key]) subjectMap[key] = { grade: grade, subject: subject, classes: [] };
+                        subjectMap[key].classes = subjectMap[key].classes.concat(classes);
+                    }
+                });
+
+                for(let key in subjectMap) {
+                    subjectMap[key].classes = [...new Set(subjectMap[key].classes)].sort((a,b)=>a-b);
+                    periodExams.push(subjectMap[key]);
+                }
+                
+                if(periodExams.length > 0) scheduleData.push({ periodName: periodName, exams: periodExams });
+            });
+            return scheduleData;
+        }
+
+        // --- 6. 엑셀 로드 ---
         document.getElementById('excelInput').addEventListener('change', function (e) {
             const file = e.target.files[0];
             if (!file) return;
@@ -173,82 +816,56 @@
                 rawTeachers = jsonData.map(t => {
                     let cleanObj = {};
                     for (let key in t) cleanObj[key.trim()] = t[key];
+                    
+                    // 이름 결측치 예외 처리
+                    let name = cleanObj["성명"] !== undefined && cleanObj["성명"] !== null ? String(cleanObj["성명"]).trim() : "";
+                    
+                    // 학년/반 파싱 시 NaN 예외 처리 방어 코드
+                    let gradeParsed = cleanObj["담당학년"] ? parseInt(String(cleanObj["담당학년"]).replace(/[^0-9]/g, '')) : null;
+                    let classParsed = cleanObj["담당반"] ? parseInt(String(cleanObj["담당반"]).replace(/[^0-9]/g, '')) : null;
+
                     return {
                         연번: cleanObj["연번"],
-                        성명: String(cleanObj["성명"]).trim(),
+                        성명: name,
                         과목: String(cleanObj["과목"] || ""),
-                        담당학년: cleanObj["담당학년"] ? parseInt(String(cleanObj["담당학년"]).replace(/[^0-9]/g, '')) : null,
-                        담당반: cleanObj["담당반"] ? parseInt(String(cleanObj["담당반"]).replace(/[^0-9]/g, '')) : null
+                        담당학년: isNaN(gradeParsed) ? null : gradeParsed,
+                        담당반: isNaN(classParsed) ? null : classParsed
                     };
-                });
-                document.getElementById('teacherCount').innerHTML = `<strong>✔ 인식된 교사: ${rawTeachers.length}명</strong>`;
-                document.getElementById('runBtn').style.display = 'block'; // 배치 버튼 표시
+                }).filter(t => t.성명 !== ""); // 이름이 비어 있는 정체불명의 더미 행 필터링
+                
+                document.getElementById('statusIndicator').className = "status-dot active";
+                document.getElementById('uploadStatus').innerHTML = `로스터 로드됨 (${rawTeachers.length}명)`;
+                document.getElementById('runBtn').disabled = false;
             };
             reader.readAsArrayBuffer(file);
         });
 
-        // --- 3. 화면의 시간표를 읽어서 데이터로 변환 ---
-        function buildScheduleDataFromTable() {
-            let scheduleData = [];
-            const rows = document.querySelectorAll('#scheduleTable tbody tr');
-            
-            rows.forEach(row => {
-                let periodName = row.getAttribute('data-period');
-                let periodExams = [];
-                let subjectMap = {}; // "1학년_국어" -> [1,2,3,4반] 묶기 용도
-
-                const cells = row.querySelectorAll('.exam-cell');
-                cells.forEach(cell => {
-                    let subject = cell.innerText.trim();
-                    if(subject) {
-                        let grade = parseInt(cell.getAttribute('data-grade'));
-                        let classNum = parseInt(cell.getAttribute('data-class'));
-                        
-                        let key = `${grade}_${subject}`;
-                        if(!subjectMap[key]) subjectMap[key] = { grade: grade, subject: subject, classes: [] };
-                        subjectMap[key].classes.push(classNum);
-                    }
-                });
-
-                // 맵을 배열로 변환
-                for(let key in subjectMap) {
-                    periodExams.push(subjectMap[key]);
-                }
-
-                // 이 교시에 시험이 하나라도 있으면 스케줄에 추가
-                if(periodExams.length > 0) {
-                    scheduleData.push({ periodName: periodName, exams: periodExams });
-                }
-            });
-            return scheduleData;
-        }
-
-        // --- 4. 자동 배치 실행 로직 ---
+        // --- 7. 알고리즘 실행 ---
         function runAssignment() {
-            const currentScheduleData = buildScheduleDataFromTable();
+            const currentScheduleData = buildScheduleData();
             
             if(currentScheduleData.length === 0) {
-                alert("입력된 시험 시간표가 없습니다! 표에 과목을 입력해 주세요.");
+                alert("일정 영역에 시험 과목이 정의되어 있지 않습니다.");
                 return;
             }
 
-            let teachers = rawTeachers.map(t => ({ ...t, totalCount: 0, assignments: [] }));
+            let teachers = rawTeachers.map(t => ({ ...t, totalCount: 0 }));
             let allResults = [];
 
             currentScheduleData.forEach(period => {
                 let periodResult = { periodName: period.periodName, rooms: {}, hallway: [] };
-                
                 let activeSubjects = new Set();
                 period.exams.forEach(ex => activeSubjects.add(ex.subject));
 
+                // 과목명 정확히 일치 비교
                 let availablePool = teachers.filter(t => {
+                    let teacherSubjects = String(t.과목 || "").split(',').map(s => s.trim());
                     for (let examSubj of activeSubjects) {
-                        if (t.과목.includes(examSubj)) return false; 
+                        if (teacherSubjects.includes(examSubj)) return false; 
                     }
                     return true;
                 });
 
-                // 교실 배정
                 for (let g = 1; g <= 3; g++) {
                     for (let c = 1; c <= 8; c++) {
                         let subject = null;
@@ -257,19 +874,23 @@
                         }
                         if (!subject) continue; 
 
+                        // 일관성 있는 랜덤 가중치 미리 할당
+                        availablePool.forEach(t => t.rand = Math.random());
                         availablePool.sort((a, b) => {
-                            if (a.totalCount === b.totalCount) return Math.random() - 0.5;
+                            if (a.totalCount === b.totalCount) return a.rand - b.rand;
                             return a.totalCount - b.totalCount;
                         });
 
                         let roomTeachers = [];
                         for (let i = 0; i < availablePool.length; i++) {
                             let candidate = availablePool[i];
-                            if (String(candidate.담당학년) === String(g) && String(candidate.담당반) === String(c)) continue; 
+                            
+                            let candGrade = candidate.담당학년 !== null ? String(candidate.담당학년) : "";
+                            let candClass = candidate.담당반 !== null ? String(candidate.담당반) : "";
+                            if (candGrade === String(g) && candClass === String(c)) continue; 
 
                             roomTeachers.push(candidate);
                             candidate.totalCount += 1; 
-                            candidate.assignments.push(`[${period.periodName}] ${g}학년 ${c}반`);
                             
                             availablePool.splice(i, 1);
                             i--; 
@@ -279,172 +900,199 @@
                     }
                 }
 
-                // 🌟 수정됨: 복도 배정 (시험이 있는 층만 배정)
                 for (let row = 0; row < 4; row++) {
-                    // 현재 층에 시험이 하나라도 있는지 검사 (1~3학년의 해당 라인 반들 확인)
                     let hasExamOnFloor = false;
                     for (let g = 1; g <= 3; g++) {
                         let c1 = row * 2 + 1;
                         let c2 = row * 2 + 2;
                         if (periodResult.rooms[`${g}-${c1}`] || periodResult.rooms[`${g}-${c2}`]) {
-                            hasExamOnFloor = true;
-                            break; // 하나라도 시험이 있으면 더 이상 검사할 필요 없음
+                            hasExamOnFloor = true; break;
                         }
                     }
 
-                    // 시험이 있는 층일 경우에만 복도 감독 배정
                     if (hasExamOnFloor) {
+                        // 복도 배정용 풀 역시 안전한 랜덤 가중치 부여 후 정렬
+                        availablePool.forEach(t => t.rand = Math.random());
                         availablePool.sort((a, b) => {
-                            if (a.totalCount === b.totalCount) return Math.random() - 0.5;
+                            if (a.totalCount === b.totalCount) return a.rand - b.rand;
                             return a.totalCount - b.totalCount;
                         });
 
                         if (availablePool.length > 0) {
                             let hwTeacher = availablePool.shift();
                             hwTeacher.totalCount += 1;
-                            hwTeacher.assignments.push(`[${period.periodName}] ${departments[row]} 복도`);
                             periodResult.hallway.push(hwTeacher);
                         } else {
-                            periodResult.hallway.push("SHORTAGE"); // 대기 인원 부족
+                            periodResult.hallway.push("SHORTAGE"); 
                         }
                     } else {
-                        periodResult.hallway.push("NO_EXAM"); // 이 층은 시험 없음
+                        periodResult.hallway.push("NO_EXAM"); 
                     }
                 }
                 allResults.push(periodResult);
             });
 
-            renderAllPeriods(allResults);
-            renderTeacherSummary(teachers);
+            renderDashboard(allResults);
         }
 
-        // --- 5. UI 렌더링 함수 ---
-        function renderAllPeriods(allResults) {
-            const mainOutput = document.getElementById('mainOutput');
-            mainOutput.innerHTML = ''; 
+        // --- 8. UI 대시보드 렌더링 ---
+        function renderDashboard(allResults) {
+            const outputArea = document.getElementById('mainOutput');
+            outputArea.innerHTML = ''; 
 
             allResults.forEach(period => {
-                const periodDiv = document.createElement('div');
-                periodDiv.className = 'period-container';
+                const block = document.createElement('div');
+                block.className = 'period-block';
                 
-                const title = document.createElement('div');
-                title.className = 'period-title';
-                title.textContent = period.periodName;
-                periodDiv.appendChild(title);
+                const header = document.createElement('div');
+                header.className = 'period-header';
+                header.textContent = period.periodName;
+                block.appendChild(header);
 
                 const building = document.createElement('div');
-                building.className = 'building-container';
+                building.className = 'building';
 
                 for (let row = 0; row < 4; row++) {
-                    const floorDiv = document.createElement('div');
-                    floorDiv.className = 'floor';
+                    const floorRow = document.createElement('div');
+                    floorRow.className = 'floor-row';
 
-                    const deptLabel = document.createElement('div');
-                    deptLabel.className = 'dept-label';
-                    deptLabel.textContent = departments[row];
-                    floorDiv.appendChild(deptLabel);
+                    const label = document.createElement('div');
+                    label.className = 'dept-label';
+                    label.textContent = departments[row];
+                    floorRow.appendChild(label);
 
                     for (let g = 1; g <= 3; g++) {
-                        const class1 = row * 2 + 1;
-                        const class2 = row * 2 + 2;
+                        const classGroup = document.createElement('div');
+                        classGroup.className = 'class-group';
 
-                        floorDiv.appendChild(createClassCard(g, class1, period.rooms));
-                        floorDiv.appendChild(createClassCard(g, class2, period.rooms));
+                        const c1 = row * 2 + 1;
+                        const c2 = row * 2 + 2;
+                        
+                        classGroup.appendChild(createClassCard(g, c1, period.rooms));
+                        classGroup.appendChild(createClassCard(g, c2, period.rooms));
+                        floorRow.appendChild(classGroup);
 
                         if (g < 3) {
                             const spacer = document.createElement('div');
                             spacer.className = 'spacer';
-                            floorDiv.appendChild(spacer);
+                            floorRow.appendChild(spacer);
                         }
                     }
 
-                    const finalSpacer = document.createElement('div');
-                    finalSpacer.className = 'spacer';
-                    floorDiv.appendChild(finalSpacer);
-
-                    // 🌟 수정됨: 복도 감독 렌더링 (시험 없음 상태 추가)
-                    const hwCard = document.createElement('div');
-                    hwCard.className = 'hallway-card';
+                    const hwZone = document.createElement('div');
+                    hwZone.className = 'hallway-zone';
                     const hwTeacher = period.hallway[row];
                     
-                    let hwHtml = `<div class="class-title" style="color:#856404; font-size:14px;">복도 감독</div>`;
-                    
                     if (hwTeacher === "NO_EXAM") {
-                        // 시험이 없는 층은 회색으로 비활성화 처리
-                        hwHtml += `<div class="teacher-info" style="color:#aaa; background:transparent;">- 시험 없음 -</div>`;
-                        hwCard.style.backgroundColor = "#f8f9fa";
-                        hwCard.style.borderColor = "#ddd";
-                        hwCard.querySelector('.class-title').style.color = "#888";
+                        hwZone.innerHTML = `<span style="color:var(--text-muted); font-size:10px;">미시행</span>`;
                     } else if (hwTeacher === "SHORTAGE") {
-                        hwHtml += `<div class="teacher-info error-text">대기 인원 부족</div>`;
+                        hwZone.classList.add('active');
+                        hwZone.style.borderColor = '#fecdd3';
+                        hwZone.style.background = '#fff1f2';
+                        hwZone.innerHTML = `<div class="hw-error">인원 부족</div>`;
                     } else if (hwTeacher) {
-                        hwHtml += `<div class="teacher-info" style="background:white; font-weight:bold;">${hwTeacher.성명}<br><span style="font-size:11px; font-weight:normal;">(${hwTeacher.과목})</span></div>`;
+                        hwZone.classList.add('active');
+                        hwZone.innerHTML = `
+                            <div class="hw-label">복도</div>
+                            <div class="hw-teacher">${hwTeacher.성명}</div>
+                        `;
                     }
-                    
-                    hwCard.innerHTML = hwHtml;
-                    floorDiv.appendChild(hwCard);
-
-                    building.appendChild(floorDiv);
+                    floorRow.appendChild(hwZone);
+                    building.appendChild(floorRow);
                 }
-                periodDiv.appendChild(building);
-                mainOutput.appendChild(periodDiv);
+                
+                block.appendChild(building);
+                outputArea.appendChild(block);
             });
+
+            if(allResults.length > 0) {
+                document.getElementById('mainOutput').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
         }
 
         function createClassCard(grade, classNum, roomsResult) {
             const card = document.createElement('div');
-            card.className = `classroom grade-box-${grade}`;
-            
-            const roomKey = `${grade}-${classNum}`;
-            const roomData = roomsResult[roomKey];
+            const roomData = roomsResult[`${grade}-${classNum}`];
 
-            let html = `<div class="class-title">${grade}학년 ${classNum}반</div>`;
-            
             if (roomData) {
-                html += `<div class="exam-subject">[ ${roomData.subject} ]</div>`;
+                card.className = `class-card g${grade}`;
+                let html = `
+                    <div class="card-meta">${grade}학년 ${classNum}반</div>
+                    <div class="card-subject">${roomData.subject}</div>
+                    <div class="teacher-box">
+                `;
+                
                 if (roomData.teachers.length === 2) {
-                    html += `<div class="teacher-info">${roomData.teachers[0].성명} (${roomData.teachers[0].과목})</div>`;
-                    html += `<div class="teacher-info">${roomData.teachers[1].성명} (${roomData.teachers[1].과목})</div>`;
+                    html += `<div class="teacher-name">${roomData.teachers[0].성명}</div>`;
+                    html += `<div class="teacher-name">${roomData.teachers[1].성명}</div>`;
                 } else if (roomData.teachers.length === 1) {
-                    html += `<div class="teacher-info">${roomData.teachers[0].성명} (${roomData.teachers[0].과목})</div>`;
-                    html += `<div class="teacher-info error-text">교사 부족! (1명)</div>`;
+                    html += `<div class="teacher-name">${roomData.teachers[0].성명}</div>`;
+                    html += `<div class="teacher-name error">공석</div>`;
                 } else {
-                    html += `<div class="teacher-info error-text">교사 부족! (0명)</div>`;
+                    html += `<div class="teacher-name error" style="flex:1;">배정오류</div>`;
                 }
+                html += `</div>`;
+                card.innerHTML = html;
             } else {
-                html += `<div class="exam-subject" style="color:#aaa;">- 시험 없음 -</div>`;
+                card.className = `class-card empty`;
+                card.innerHTML = `<div class="card-meta" style="margin:auto 0;">${grade}-${classNum}</div>`;
             }
-            card.innerHTML = html;
             return card;
         }
 
-        function renderTeacherSummary(teachers) {
-            const mainOutput = document.getElementById('mainOutput');
-            const summaryDiv = document.createElement('div');
-            summaryDiv.style.marginTop = "50px";
-            summaryDiv.style.padding = "20px";
-            summaryDiv.style.background = "#fff3cd";
-            summaryDiv.style.border = "2px solid #ffe69c";
-            summaryDiv.style.borderRadius = "8px";
-            summaryDiv.innerHTML = "<h3 style='margin-top:0; color:#856404;'>🛠️ [검증용] 교사별 배정 요약</h3>";
-
-            const sortedTeachers = [...teachers].sort((a, b) => a.연번 - b.연번);
-            let html = `<ul style="list-style:none; padding:0; margin:0;">`;
-            
-            sortedTeachers.forEach(t => {
-                const role = (t.담당학년 && t.담당반) ? `<span style="color:blue;">[${t.담당학년}-${t.담당반} 담임]</span>` : `[비담임]`;
-                const places = t.assignments.length > 0 
-                    ? `<strong style="color:red;">${t.assignments.join(", ")}</strong>` 
-                    : `<span style="color:gray;">배정 없음</span>`;
-
-                html += `<li style="padding: 8px 0; border-bottom: 1px dashed #ffe69c;">
-                        <strong>${t.연번}. ${t.성명}</strong> (${t.과목}) ${role} 👉 총 ${t.totalCount}회 : ${places}
-                    </li>`;
-            });
-            html += `</ul>`;
-            summaryDiv.innerHTML += html;
-            mainOutput.appendChild(summaryDiv);
+        // --- 9. 세팅 및 테마 제어 로직 ---
+        function hasAnySubject() {
+            return document.querySelectorAll('.exam-cell.has-subject').length > 0;
         }
+
+        function changeDays(val) {
+            const input = document.getElementById('daysInput');
+            let current = parseInt(input.value);
+            let next = current + val;
+            if (next < 1 || next > 10) return;
+            
+            if (hasAnySubject()) {
+                if (!confirm("시험 일수를 변경하면 현재 작성 중인 일정 데이터가 초기화됩니다. 계속하시겠습니까?")) return;
+            }
+            
+            maxDays = next;
+            input.value = next;
+            initScheduleTable();
+        }
+
+        function changePeriods(val) {
+            const input = document.getElementById('periodsInput');
+            let current = parseInt(input.value);
+            let next = current + val;
+            if (next < 1 || next > 10) return;
+            
+            if (hasAnySubject()) {
+                if (!confirm("최대 교시를 변경하면 현재 작성 중인 일정 데이터가 초기화됩니다. 계속하시겠습니까?")) return;
+            }
+            
+            maxPeriods = next;
+            input.value = next;
+            initScheduleTable();
+        }
+
+        function toggleTheme() {
+            const body = document.body;
+            const text = document.getElementById('themeToggleText');
+            const icon = document.getElementById('themeIcon');
+            
+            body.classList.toggle('dark-theme');
+            const isDark = body.classList.contains('dark-theme');
+            
+            if (isDark) {
+                text.textContent = "라이트 테마 전환";
+                icon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.223l-1.591 1.591M5.25 12H3m4.223-4.773L5.632 5.632M12 7.5a4.5 4.5 0 100 9 4.5 4.5 0 000-9z"></path>`;
+            } else {
+                text.textContent = "다크 테마 전환";
+                icon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z"></path>`;
+            }
+        }
+
+        initScheduleTable();
     </script>
 </body>
 </html>
