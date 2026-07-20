@@ -8,392 +8,361 @@
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.8/dist/web/static/pretendard.css" />
     <style>
         :root {
-            --bg-app: #f5f5f4;       /* 스타크 화이트를 배제한, 눈이 편안한 웜그레이 (Stone 100) */
-            --bg-canvas: #fafaf9;    /* 강한 반사광을 차단한 크림 오프화이트 (Stone 50) */
-            --text-primary: #1c1917;  /* 부드러운 딥 브라운 그레이 (Stone 900) */
-            --text-secondary: #44403c;/* Stone 700 */
-            --text-muted: #78716c;    /* Stone 500 */
-            --border-primary: #e7e5e4;/* 경계선을 차분하게 감싸주는 소프트 샌드보더 (Stone 200) */
-            --border-muted: #f5f5f4;  /* 내부 요소를 구분하는 보조 라인 (Stone 100) */
-            --primary: #4f46e5;
-            --primary-hover: #4338ca;
-            
-            --g1-tint: #eff6ff; --g1-stroke: #3b82f6; --g1-text: #1d4ed8;
-            --g2-tint: #f0fdf4; --g2-stroke: #10b981; --g2-text: #047857;
-            --g3-tint: #fff1f2; --g3-stroke: #f43f5e; --g3-text: #be185d;
-            
-            --hw-active-bg: #f5f3ff;
-            --hw-active-border: #c7d2fe;
+            /* 공통 테마 컬러 */
+            --bg-app: #f5f5f4;
+            --bg-canvas: #ffffff;
+            --bg-input: #fafaf9;
+            --text-primary: #1c1917;
+            --text-secondary: #44403c;
+            --text-muted: #78716c;
+            --border-primary: #e7e5e4;
+            --border-muted: #f5f5f4;
+
+            /* 타 앱과 통일된 Green Primary */
+            --primary: #16a34a;       
+            --primary-hover: #15803d;
+            --primary-light: rgba(22, 163, 74, 0.1);
+            --danger: #ef4444;
+
+            /* gamdog 전용 테이블 변수 */
+            --g1-tint: #f8fafc; --g1-stroke: #94a3b8; --g1-text: #475569;
+            /* 2학년: Green (메인 테마 컬러와 통일감 부여) */
+            --g2-tint: #f0fdf4; --g2-stroke: #86efac; --g2-text: #15803d;
+            /* 3학년: Terracotta (따뜻하고 차분한 오렌지) */
+            --g3-tint: #fff7ed; --g3-stroke: #fdba74; --g3-text: #c2410c;
+            --hw-active-bg: #f0fdf4;
+            --hw-active-border: #86efac;
+
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
         }
 
-        body.dark-theme {
+        [data-theme="dark"] {
             --bg-app: #09090b;
             --bg-canvas: #18181b;
+            --bg-input: #27272a;
             --text-primary: #fafafa;
             --text-secondary: #e4e4e7;
             --text-muted: #a1a1aa;
             --border-primary: #27272a;
             --border-muted: #18181b;
-            --primary: #6366f1;
-            --primary-hover: #4f46e5;
             
-            --g1-tint: rgba(59, 130, 246, 0.15); --g1-stroke: #3b82f6; --g1-text: #60a5fa;
-            --g2-tint: rgba(16, 185, 129, 0.15); --g2-stroke: #10b981; --g2-text: #34d399;
-            --g3-tint: rgba(244, 63, 94, 0.15);  --g3-stroke: #f43f5e; --g3-text: #fb7185;
+            --primary: #9EFF8D;       
+            --primary-hover: #7CE86B;
+            --primary-light: rgba(158, 255, 141, 0.15);
 
-            --hw-active-bg: rgba(99, 102, 241, 0.15);
-            --hw-active-border: rgba(99, 102, 241, 0.4);
+            --g1-tint: rgba(148, 163, 184, 0.1); --g1-stroke: #475569; --g1-text: #94a3b8;
+            --g2-tint: rgba(22, 163, 74, 0.1);   --g2-stroke: #16a34a; --g2-text: #4ade80;
+            --g3-tint: rgba(234, 88, 12, 0.1);   --g3-stroke: #9a3412; --g3-text: #fb923c;
+            --hw-active-bg: rgba(16, 185, 129, 0.15);
+            --hw-active-border: rgba(16, 185, 129, 0.4);
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { 
-            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif; 
-            background-color: var(--bg-app); 
-            color: var(--text-primary); 
-            line-height: 1.4; 
-            -webkit-font-smoothing: antialiased;
-            transition: background-color 0.2s, color 0.2s;
-        }
+        body.preload, body.preload * { transition: none !important; }
+        body { font-family: 'Pretendard', sans-serif; background: var(--bg-app); color: var(--text-primary); transition: 0.2s; }
 
-        /* App Layout Grid */
-        .app-layout {
-            display: grid;
-            grid-template-columns: 1fr 380px;
-            min-height: 100vh;
-        }
+        /* 1. 기본 레이아웃 (Left Sidebar 340px) */
+        .app-layout { display: grid; grid-template-columns: 340px 1fr; min-height: 100vh; }
+        .mobile-header { display: none; }
+        #overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(2px); z-index: 90; opacity: 0; visibility: hidden; transition: 0.2s; }
+        #overlay.active { opacity: 1; visibility: visible; }
 
-        /* Left Workspace (Canvas / Results) */
-        .workspace {
-            padding: 40px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 32px;
-            background-color: var(--bg-app);
-            background-image: radial-gradient(var(--border-primary) 1px, transparent 1px);
-            background-size: 24px 24px;
-        }
+        /* 2. 사이드바 (Control Panel) */
+        .control-panel { background: var(--bg-canvas); border-right: 1px solid var(--border-primary); display: flex; flex-direction: column; height: 100vh; position: sticky; top: 0; z-index: 100; }
+        .brand-deck { padding: 24px; border-bottom: 1px solid var(--border-primary); }
+        .brand-title { display: flex; align-items: center; gap: 12px; }
+        .brand-logo-box { width: 36px; height: 36px; background: var(--primary); color: var(--bg-canvas); border-radius: 10px; display: flex; align-items: center; justify-content: center; }
+        .brand-logo-box svg { width: 20px; height: 20px; }
+        .brand-text h2 { font-size: 16px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.2; }
+        .brand-text p { font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
 
-        .workspace-card {
-            background: var(--bg-canvas);
-            border: 1px solid var(--border-primary);
-            border-radius: 12px;
-            padding: 24px;
-            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.02);
-        }
+        .panel-scroll-area { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 32px; }
+        .group-label { display: block; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 12px; }
 
-        .workspace-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            gap: 12px;
-        }
+        /* 공통 인풋/설정 카드 */
+        .grid-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .input-card { background: var(--bg-input); border: 1px solid var(--border-primary); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
+        .input-card label { font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+        .number-stepper { display: flex; align-items: center; justify-content: space-between; }
+        .number-stepper button { background: none; border: none; font-size: 16px; font-weight: 700; color: var(--text-secondary); cursor: pointer; }
+        .number-stepper input { border: none; background: transparent; text-align: center; font-size: 14px; font-weight: 700; color: var(--text-primary); width: 100%; pointer-events: none; }
 
-        .section-title {
-            font-size: 14px;
-            font-weight: 700;
-            letter-spacing: -0.01em;
-            color: var(--text-primary);
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            flex-shrink: 0;
-        }
-        .section-desc {
-            font-size: 12px;
-            color: var(--text-muted);
-            font-weight: 400;
-            text-align: right;
-        }
+        .hud-card { background: var(--bg-input); border: 1px solid var(--border-primary); border-radius: 8px; padding: 16px; }
+        .hud-title { font-size: 11px; font-weight: 700; color: var(--text-muted); margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+        .status-dot { width: 6px; height: 6px; background: #d4d4d8; border-radius: 50%; }
+        .status-dot.active { background: var(--primary); box-shadow: 0 0 8px var(--primary); }
 
-        /* Sophisticated Time Table */
-        .table-container {
-            border: 1px solid var(--border-primary);
-            border-radius: 8px;
-            overflow: hidden;
-        }
-        table { width: 100%; border-collapse: collapse; user-select: none; table-layout: fixed; background-color: var(--bg-canvas); }
-        th, td { border: 1px solid var(--border-primary); padding: 0; text-align: center; font-size: 12px; height: 38px; }
-        th { background: var(--bg-app); font-weight: 600; color: var(--text-muted); font-size: 11px; letter-spacing: -0.01em; }
-        
+        .file-upload-wrapper { position: relative; }
+        .file-upload-input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+
+        /* 공통 버튼 */
+        .panel-footer { padding: 24px; border-top: 1px solid var(--border-primary); display: flex; flex-direction: column; gap: 12px; background: var(--bg-canvas); }
+        .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 12px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: 0.2s; border: 1px solid transparent; outline:none; }
+        .btn-primary { background: var(--primary); color: var(--bg-canvas); box-shadow: var(--shadow-sm); }
+        .btn-primary:hover:not(:disabled) { background: var(--primary-hover); transform: translateY(-1px); }
+        .btn-primary:disabled { background: var(--border-primary); color: var(--text-muted); cursor: not-allowed; }
+        .btn-ghost { background: transparent; color: var(--text-secondary); }
+        .btn-ghost:hover { background: var(--bg-input); color: var(--text-primary); }
+
+        [data-theme="light"] #icon-sun { display: none; }
+        [data-theme="light"] #icon-moon { display: block; }
+        [data-theme="dark"] #icon-sun { display: block; }
+        [data-theme="dark"] #icon-moon { display: none; }
+
+        /* 3. 워크스페이스 & 결과 캔버스 */
+        .workspace { padding: 40px; overflow-y: auto; display: flex; flex-direction: column; gap: 24px; background-color: var(--bg-app); background-image: radial-gradient(var(--border-primary) 1px, transparent 1px); background-size: 24px 24px; }
+        .workspace-card { background: var(--bg-canvas); border: 1px solid var(--border-primary); border-radius: 12px; padding: 24px; box-shadow: var(--shadow-sm); }
+        .workspace-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        .section-title { font-size: 15px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px; }
+        .section-desc { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+
+        /* (기존 gamdog 전용 테이블 및 결과 출력 CSS는 그대로 유지) */
+        .table-container { border: 1px solid var(--border-primary); border-radius: 8px; overflow: hidden; }
+        table { width: 100%; border-collapse: collapse; user-select: none; table-layout: fixed; background: var(--bg-canvas); }
+        th, td { border: 1px solid var(--border-primary); text-align: center; font-size: 12px; height: 38px; }
+        th { background: var(--bg-input); font-weight: 600; color: var(--text-muted); font-size: 11px; }
         .g1-header { border-bottom: 2px solid var(--g1-stroke); color: var(--g1-text); font-weight: 700; }
         .g2-header { border-bottom: 2px solid var(--g2-stroke); color: var(--g2-text); font-weight: 700; }
         .g3-header { border-bottom: 2px solid var(--g3-stroke); color: var(--g3-text); font-weight: 700; }
-
-        .exam-cell { cursor: crosshair; transition: all 0.1s ease; position: relative; color: var(--text-secondary); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .exam-cell:hover { background: var(--border-muted); }
-
-        /* Grade-specific styling */
-        .exam-cell.has-subject[data-grade="1"] {
-            background: var(--g1-tint) !important;
-            color: var(--g1-text);
-            box-shadow: inset 3px 0 0 0 var(--g1-stroke);
-            font-weight: 700;
-            font-size: 11px;
-        }
-        .exam-cell.has-subject[data-grade="2"] {
-            background: var(--g2-tint) !important;
-            color: var(--g2-text);
-            box-shadow: inset 3px 0 0 0 var(--g2-stroke);
-            font-weight: 700;
-            font-size: 11px;
-        }
-        .exam-cell.has-subject[data-grade="3"] {
-            background: var(--g3-tint) !important;
-            color: var(--g3-text);
-            box-shadow: inset 3px 0 0 0 var(--g3-stroke);
-            font-weight: 700;
-            font-size: 11px;
-        }
-
-        /* Dynamic Selector Highlighting */
-        .exam-cell.selected { background: rgba(79, 70, 229, 0.08) !important; color: var(--primary); }
+        .exam-cell { cursor: crosshair; color: var(--text-secondary); transition: 0.1s; }
+        .exam-cell:hover { background: var(--bg-input); }
+        .exam-cell.has-subject[data-grade="1"] { background: var(--g1-tint) !important; color: var(--g1-text); box-shadow: inset 3px 0 0 0 var(--g1-stroke); font-weight: 700; }
+        .exam-cell.has-subject[data-grade="2"] { background: var(--g2-tint) !important; color: var(--g2-text); box-shadow: inset 3px 0 0 0 var(--g2-stroke); font-weight: 700; }
+        .exam-cell.has-subject[data-grade="3"] { background: var(--g3-tint) !important; color: var(--g3-text); box-shadow: inset 3px 0 0 0 var(--g3-stroke); font-weight: 700; }
+        .exam-cell.selected { background: var(--primary-light) !important; color: var(--primary); }
         .exam-cell.sel-single { box-shadow: inset 0 0 0 1.5px var(--primary); }
         .exam-cell.sel-left { box-shadow: inset 1.5px 0 0 0 var(--primary), inset 0 1.5px 0 0 var(--primary), inset 0 -1.5px 0 0 var(--primary); }
         .exam-cell.sel-mid { box-shadow: inset 0 1.5px 0 0 var(--primary), inset 0 -1.5px 0 0 var(--primary); }
         .exam-cell.sel-right { box-shadow: inset -1.5px 0 0 0 var(--primary), inset 0 1.5px 0 0 var(--primary), inset 0 -1.5px 0 0 var(--primary); }
 
-        /* Right Control Column (Sidebar Panel) */
-        .control-panel {
-            background-color: var(--bg-canvas);
-            border-left: 1px solid var(--border-primary);
-            padding: 32px 24px;
-            display: flex;
-            flex-direction: column;
-            gap: 24px;
-            position: sticky;
-            top: 0;
-            height: 100vh;
-            overflow-y: auto;
-        }
+        .empty-state { text-align: center; padding: 60px 20px; background: var(--bg-canvas); border: 1px dashed var(--border-primary); border-radius: 12px; }
+        .empty-icon { width: 48px; height: 48px; color: var(--text-muted); margin-bottom: 16px; }
+        .empty-state h3 { font-size: 14px; font-weight: 700; color: var(--text-secondary); margin-bottom: 4px; }
+        .empty-state p { font-size: 12px; color: var(--text-muted); }
 
-        .brand-deck {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding-bottom: 20px;
-            border-bottom: 1px solid var(--border-muted);
-        }
-        .brand-logo {
-            width: 32px;
-            height: 32px;
-            background-color: var(--primary);
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-        }
-        .brand-logo svg { width: 18px; height: 18px; }
-        .brand-info h1 { font-size: 15px; font-weight: 800; letter-spacing: -0.03em; color: var(--text-primary); }
-        .brand-info p { font-size: 11px; color: var(--text-muted); }
+        /* 모달 */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; z-index: 200; opacity: 0; pointer-events: none; transition: 0.2s; }
+        .modal-overlay.active { opacity: 1; pointer-events: auto; }
+        .modal-content { background: var(--bg-canvas); padding: 24px; border-radius: 12px; width: 320px; box-shadow: var(--shadow-md); transform: scale(0.95); transition: 0.2s; }
+        .modal-overlay.active .modal-content { transform: scale(1); }
+        .modal-title { font-size: 14px; font-weight: 700; margin-bottom: 16px; }
+        .modal-input { width: 100%; padding: 10px; border: 1px solid var(--border-primary); border-radius: 8px; font-size: 13px; margin-bottom: 20px; outline: none; background: var(--bg-input); color: var(--text-primary); }
+        .modal-input:focus { border-color: var(--primary); }
+        .modal-footer { display: flex; justify-content: flex-end; gap: 8px; }
 
-        .hud-card {
-            background: var(--bg-app);
-            border: 1px solid var(--border-primary);
-            border-radius: 8px;
-            padding: 18px;
-        }
-        .hud-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 12px; display: flex; align-items: center; gap: 6px;}
-        .status-dot { width: 6px; height: 6px; background-color: #d4d4d8; border-radius: 50%; display: inline-block; transition: background-color 0.2s; }
-        .status-dot.active { background-color: #10b981; box-shadow: 0 0 8px #10b981; }
-
-        .control-group { display: flex; flex-direction: column; gap: 10px; }
-        .control-label { font-size: 11px; font-weight: 600; color: var(--text-secondary); }
-
-        /* Setting Steppers */
-        .settings-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-        }
-        .settings-item {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-        .settings-item label {
-            font-size: 10px;
-            font-weight: 600;
-            color: var(--text-muted);
-        }
-        .number-stepper {
-            display: flex;
-            align-items: center;
-            border: 1px solid var(--border-primary);
-            border-radius: 6px;
-            overflow: hidden;
-            background: var(--bg-canvas);
-        }
-        .number-stepper button {
-            background: none;
-            border: none;
-            width: 28px;
-            height: 28px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            color: var(--text-secondary);
-            transition: background 0.1s;
-        }
-        .number-stepper button:hover {
-            background: var(--border-muted);
-        }
-        .number-stepper input {
-            width: 100%;
-            border: none;
-            text-align: center;
-            font-size: 12px;
-            font-weight: 700;
-            background: none;
-            color: var(--text-primary);
-            pointer-events: none;
-        }
-
-        /* Figma Style Custom File Button */
-        .file-upload-wrapper { position: relative; width: 100%; }
-        .file-upload-input { position: absolute; left: 0; top: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
-        
-        .btn {
-            display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-            width: 100%; padding: 10px 16px; border-radius: 6px; font-size: 13px; font-weight: 600;
-            border: 1px solid transparent; cursor: pointer; transition: all 0.15s ease;
-            letter-spacing: -0.01em;
-        }
-        .btn-outline { background: var(--bg-canvas); border-color: var(--border-primary); color: var(--text-primary); box-shadow: 0 1px 2px rgba(0,0,0,0.02); }
-        .btn-outline:hover { background: var(--border-muted); border-color: #cbd5e1; }
-        .btn-primary { background: var(--text-primary); color: var(--bg-canvas); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        .btn-primary:hover { background: var(--text-secondary); }
-        .btn-primary:disabled { background: var(--border-primary); color: var(--text-muted); cursor: not-allowed; box-shadow: none; }
-
-        /* Output Design Overhaul */
-        .empty-state {
-            padding: 60px 20px;
-            text-align: center;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            color: var(--text-muted);
-        }
-        .empty-icon {
-            width: 48px; height: 48px;
-            color: #d4d4d8; margin-bottom: 16px;
-        }
-        .empty-state h3 { font-size: 13px; font-weight: 700; color: var(--text-secondary); margin-bottom: 4px; }
-        .empty-state p { font-size: 11px; max-width: 260px; line-height: 1.5; }
-
-        .period-block { background: var(--bg-canvas); border: 1px solid var(--border-primary); border-radius: 12px; padding: 24px; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.02); margin-bottom: 20px; }
-        .period-block:last-child { margin-bottom: 0; }
-        .period-header { font-size: 14px; font-weight: 800; color: var(--text-primary); margin-bottom: 18px; padding-bottom: 10px; border-bottom: 1px solid var(--border-muted); letter-spacing: -0.01em; }
-        
-        .building { display: flex; flex-direction: column; gap: 10px; }
-        .floor-row { display: flex; align-items: stretch; gap: 8px; background: var(--bg-app); padding: 8px; border-radius: 8px; border: 1px solid var(--border-muted); }
-        
-        .dept-label { width: 52px; display: flex; align-items: center; justify-content: center; background: var(--text-primary); color: var(--bg-canvas); font-weight: 800; border-radius: 5px; font-size: 11px; flex-shrink: 0; }
-
+        /* 결과 렌더링 스타일 (기존 유지) */
+        .period-block { background: var(--bg-canvas); border: 1px solid var(--border-primary); border-radius: 12px; padding: 24px; margin-bottom: 24px; }
+        .period-header { font-size: 14px; font-weight: 800; border-bottom: 1px solid var(--border-muted); padding-bottom: 12px; margin-bottom: 16px; }
+        .floor-row { display: flex; gap: 8px; background: var(--bg-input); padding: 8px; border-radius: 8px; margin-bottom: 8px; }
         .class-group { display: flex; gap: 6px; flex: 1; }
-        .class-card { flex: 1; background: var(--bg-canvas); border: 1px solid var(--border-primary); border-radius: 6px; padding: 8px; text-align: center; display: flex; flex-direction: column; justify-content: center; min-height: 72px; }
-        
+        .class-card { flex: 1; background: var(--bg-canvas); border: 1px solid var(--border-primary); border-radius: 6px; padding: 8px; text-align: center; }
         .class-card.g1 { border-left: 3px solid var(--g1-stroke); }
         .class-card.g2 { border-left: 3px solid var(--g2-stroke); }
         .class-card.g3 { border-left: 3px solid var(--g3-stroke); }
-        .class-card.empty { opacity: 0.35; background: transparent; border: 1px dashed var(--border-primary); }
-        
-        .card-meta { font-size: 10px; color: var(--text-muted); font-weight: 600; margin-bottom: 2px; }
-        .card-subject { font-size: 12px; font-weight: 800; color: var(--text-primary); margin-bottom: 6px; }
-        
-        .teacher-box { display: flex; gap: 3px; justify-content: center; margin-top: auto; }
-        .teacher-name { background: var(--border-muted); font-size: 10px; padding: 2px 4px; border-radius: 3px; font-weight: 600; border: 1px solid var(--border-primary); flex: 1; color: var(--text-secondary); }
-        .teacher-name.error { background: #fff1f2; color: #e11d48; border-color: #fecdd3; }
+        .class-card.empty { opacity: 0.4; border: 1px dashed var(--border-primary); }
+        .card-meta { font-size: 10px; color: var(--text-muted); margin-bottom: 4px; font-weight: 600; }
+        .card-subject { font-size: 12px; font-weight: 800; margin-bottom: 6px; }
+        .teacher-box { display: flex; gap: 4px; }
+        .teacher-name { background: var(--bg-input); font-size: 10px; padding: 4px; border-radius: 4px; border: 1px solid var(--border-primary); flex: 1; font-weight: 600; }
 
-        .hallway-zone { width: 84px; flex-shrink: 0; border: 1px dashed var(--border-primary); border-radius: 5px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--bg-canvas); padding: 4px; }
-        .hallway-zone.active { border: 1px solid var(--hw-active-border); background: var(--hw-active-bg); }
-        .hw-label { font-size: 9px; color: var(--primary); font-weight: 800; margin-bottom: 1px; }
-        .hw-teacher { font-size: 11px; font-weight: 800; color: var(--text-primary); }
-        .hw-error { font-size: 10px; color: #e11d48; font-weight: 800; }
-
-        .spacer { width: 6px; flex-shrink: 0; border-right: 1px dashed var(--border-primary); margin-right: 2px; }
-
-        /* Clean Minimal Modal */
-        .modal-overlay { position: fixed; inset: 0; background: rgba(9, 9, 11, 0.2); backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; z-index: 200; opacity: 0; pointer-events: none; transition: opacity 0.1s ease-in-out; }
-        .modal-overlay.active { opacity: 1; pointer-events: auto; }
-        .modal-content { background: var(--bg-canvas); padding: 20px; border-radius: 10px; width: 300px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05); transform: scale(0.98); transition: transform 0.1s ease; border: 1px solid var(--border-primary); }
-        .modal-overlay.active .modal-content { transform: scale(1); }
-        .modal-title { font-size: 13px; font-weight: 700; margin-bottom: 10px; color: var(--text-primary); }
-        .modal-input { width: 100%; padding: 8px 10px; border: 1px solid var(--border-primary); border-radius: 5px; font-size: 12px; margin-bottom: 16px; outline: none; background: var(--bg-canvas); color: var(--text-primary); }
-        .modal-input:focus { border-color: var(--primary); }
-        .modal-footer { display: flex; justify-content: space-between; }
-        .modal-footer .btn { width: auto; padding: 6px 12px; font-size: 12px; }
-
-        /* ------------------------------------------------------------------
-           [반응형 웹 디자인을 위한 미디어 쿼리 추가 영역]
-        ------------------------------------------------------------------ */
+        /* 4. 모바일 반응형 처리 */
         @media (max-width: 1024px) {
-            /* 2열 레이아웃을 1열 레이아웃으로 변경 */
-            .app-layout {
-                grid-template-columns: 1fr;
-                min-height: auto;
-            }
+            .app-layout { grid-template-columns: 1fr; min-height: auto; }
+            .mobile-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; background: var(--bg-canvas); border-bottom: 1px solid var(--border-primary); position: sticky; top: 0; z-index: 80; }
+            .brand-info { display: flex; align-items: center; gap: 8px; }
+            .brand-info .brand-logo { width: 24px; height: 24px; color: var(--primary); }
+            .brand-info h1 { font-size: 16px; font-weight: 800; }
+            
+            .workspace { padding: 20px 16px; background-size: 16px 16px; }
+            .workspace-header { flex-direction: column; align-items: flex-start; gap: 8px; }
+            
+            .control-panel { position: fixed; top: auto; bottom: 0; left: 0; right: 0; height: 85vh; border-right: none; border-top: 1px solid var(--border-primary); border-radius: 20px 20px 0 0; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 100; box-shadow: 0 -10px 40px rgba(0,0,0,0.1); }
+            .control-panel.active { transform: translateY(0); }
+            .brand-deck { display: none; }
+            .panel-scroll-area { padding: 20px; }
+            .panel-footer { padding: 20px; padding-bottom: calc(20px + env(safe-area-inset-bottom)); }
 
-            /* 조작 패널(Sidebar)을 화면 최상단으로 우선 배치하여 모바일 플로우 최적화 */
-            .control-panel {
-                position: relative;
-                height: auto;
-                border-left: none;
-                border-bottom: 1px solid var(--border-primary);
-                padding: 24px 20px;
-                order: -1; /* 최상단 배치 */
-            }
-
-            /* 시간표 수립 및 결과 영역 */
-            .workspace {
-                padding: 24px 16px;
-                gap: 24px;
-            }
-
-            /* 테이블 레이아웃 압착 방지를 위한 가로 스크롤 보장 */
-            .table-container {
-                overflow-x: auto;
-                -webkit-overflow-scrolling: touch; /* 부드러운 스크롤 */
-            }
-            table {
-                min-width: 1000px; /* 열 개수가 많으므로 일정 너비를 유지 */
-            }
-
-            /* 결과 배치도 층별 구성 가로 스크롤 설정 */
-            .building {
-                overflow-x: auto;
-                -webkit-overflow-scrolling: touch;
-                padding-bottom: 8px; /* 스크롤바 영역 확보 */
-            }
-            .floor-row {
-                min-width: 820px; /* 기존 형태의 완전한 구성을 유려하게 표현하기 위한 최소 폭 */
-            }
+            .table-container, .building { overflow-x: auto; }
+            table { min-width: 1000px; }
+            .floor-row { min-width: 820px; }
         }
 
-        @media (max-width: 640px) {
-            /* 소형 모바일 최적화 */
-            .workspace-header {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 4px;
-            }
-            .section-desc {
-                text-align: left;
-            }
-            .settings-grid {
-                grid-template-columns: 1fr; /* 소형 기기에서 입력 영역 일렬 배치 */
-            }
+        /* 1. 아웃라인 버튼 다크모드 최적화 */
+        .btn-outline { 
+            background: transparent; /* 흰색이 아닌 투명 배경 사용 */
+            border-color: var(--border-primary); 
+            color: var(--text-primary); 
         }
+        .btn-outline:hover { 
+            background: var(--bg-input); 
+            border-color: var(--text-muted); 
+        }
+
+        /* 2. 추가: 모달 삭제 버튼 전용 Danger 아웃라인 스타일 */
+        .btn-danger-outline {
+            background: transparent;
+            border: 1px solid var(--danger);
+            color: var(--danger);
+            display: inline-flex; align-items: center; justify-content: center; 
+            padding: 12px; border-radius: 8px; font-size: 13px; font-weight: 600; 
+            cursor: pointer; transition: 0.2s;
+        }
+        .btn-danger-outline:hover {
+            background: rgba(239, 68, 68, 0.1); /* 다크/라이트 모두 어울리는 투명 레드 */
+        }
+
+        /* 3. 층별 라벨(dept-label) 다크테마 이질감 해소 */
+        .dept-label { 
+            width: 52px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            /* 글자색 변수를 배경으로 쓰지 않고 독립적인 UI 컬러 사용 */
+            background: var(--bg-input); 
+            border: 1px solid var(--border-primary);
+            color: var(--text-primary); 
+            font-weight: 800; 
+            border-radius: 6px; 
+            font-size: 11px; 
+        }
+
+        /* 기본 상태 (빈 공간) */
+        .hallway-zone { 
+            width: 84px; 
+            border: 1px dashed var(--border-primary); 
+            border-radius: 6px; 
+            background: transparent; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* 배정 완료 (Active) - 사방 테두리를 없애고 모던한 음각 느낌 연출 */
+        .hallway-zone.active { 
+            border-color: transparent; 
+            background: var(--bg-input); 
+        }
+
+        /* 모던 SaaS 스타일: 좌측 엣지 포인트 라인 */
+        .hallway-zone.active::before {
+            content: '';
+            position: absolute;
+            left: 0; top: 0; bottom: 0; width: 3px;
+            background: var(--primary); /* 메인 그린 컬러 포인트 */
+        }
+
+        /* 내부 텍스트 스타일 */
+        .hw-label { font-size: 9px; color: var(--text-muted); font-weight: 700; margin-bottom: 2px; }
+        .hw-teacher { font-size: 11px; font-weight: 800; color: var(--text-primary); }
+
+        /* 인원 부족 (Error) 상태 적용 */
+        .hallway-zone.error {
+            border-color: transparent;
+            background: rgba(239, 68, 68, 0.08); /* 옅은 붉은 배경 */
+        }
+        .hallway-zone.error::before {
+            content: '';
+            position: absolute;
+            left: 0; top: 0; bottom: 0; width: 3px;
+            background: var(--danger); /* 붉은색 엣지 포인트 */
+        }
+        .hw-error { font-size: 10px; color: var(--danger); font-weight: 800; }
     </style>
 </head>
 <body>
+    <!-- 1. 추가: 모바일 전용 헤더 -->
+    <header class="mobile-header">
+        <div class="brand-info">
+            <svg class="brand-logo" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"></path></svg>
+            <h1>gamdog</h1>
+        </div>
+        <button class="btn-icon" onclick="toggleSettings()" title="설정 열기">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+        </button>
+    </header>
 
     <div class="app-layout">
-        
-        <!-- 좌측 작업 캔버스 및 출력 패널 -->
+        <!-- 2. 추가: 모바일 오버레이 -->
+        <div id="overlay" onclick="toggleSettings()"></div>
+
+        <!-- 3. 좌측으로 이동: 제어 패널 (Sidebar) -->
+        <aside class="control-panel" id="controlPanel">
+            <div class="brand-deck">
+                <div class="brand-title">
+                    <div class="brand-logo-box">
+                        <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"></path></svg>
+                    </div>
+                    <div class="brand-text">
+                        <h2>Gam Dog</h2>
+                        <p>Scheduler Engine</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 스크롤 영역 -->
+            <div class="panel-scroll-area">
+                <div class="control-group">
+                    <span class="group-label">System Status</span>
+                    <div class="hud-card">
+                        <div class="hud-title">
+                            <span id="statusIndicator" class="status-dot"></span>
+                            ENGINE STATUS
+                        </div>
+                        <span id="uploadStatus" class="status-text" style="font-weight: 700; font-size: 13px;">교사 명단 미등록</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <span class="group-label">1. 기본 설정 (Settings)</span>
+                    <div class="grid-inputs">
+                        <div class="input-card">
+                            <label>시험 일수</label>
+                            <div class="number-stepper">
+                                <button onclick="changeDays(-1)">−</button>
+                                <input type="number" id="daysInput" value="2" readonly>
+                                <button onclick="changeDays(1)">+</button>
+                            </div>
+                        </div>
+                        <div class="input-card">
+                            <label>최대 교시</label>
+                            <div class="number-stepper">
+                                <button onclick="changePeriods(-1)">−</button>
+                                <input type="number" id="periodsInput" value="3" readonly>
+                                <button onclick="changePeriods(1)">+</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <span class="group-label">2. 교사 데이터 로드 (Data)</span>
+                    <div class="file-upload-wrapper">
+                        <button class="btn btn-outline" style="width: 100%;">
+                            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"></path></svg>
+                            교사 로스터 엑셀 로드
+                        </button>
+                        <input type="file" id="excelInput" class="file-upload-input" accept=".xlsx, .xls" />
+                    </div>
+                </div>
+            </div>
+
+            <!-- 하단 고정 영역 -->
+            <div class="panel-footer">
+                <button class="btn btn-ghost theme-toggle-btn" onclick="toggleTheme()">
+                    <svg id="icon-sun" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+                    <svg id="icon-moon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+                    <span id="themeToggleText">다크 테마</span>
+                </button>
+
+                <button id="runBtn" class="btn btn-primary" onclick="runAssignment()" disabled>
+                    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"></path></svg>
+                    배정 알고리즘 실행
+                </button>
+            </div>
+        </aside>
+
+        <!-- 4. 우측 메인 캔버스 -->
         <main class="workspace">
             
             <!-- 시간표 수립 카드 -->
@@ -423,78 +392,6 @@
             </section>
 
         </main>
-
-        <!-- 우측 조작 및 상태 패널 -->
-        <aside class="control-panel">
-            
-            <div class="brand-deck">
-                <div class="brand-logo">
-                    <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"></path></svg>
-                </div>
-                <div class="brand-info">
-                    <h1>gamdog</h1>
-                    <p>시험 감독 자동 배정 코어</p>
-                </div>
-            </div>
-
-            <!-- 시스템 세팅 (간소화 패널) -->
-            <div class="control-group">
-                <span class="control-label">시스템 설정</span>
-                <div class="settings-grid">
-                    <div class="settings-item">
-                        <label>시험 일수</label>
-                        <div class="number-stepper">
-                            <button onclick="changeDays(-1)">−</button>
-                            <input type="number" id="daysInput" value="2" readonly>
-                            <button onclick="changeDays(1)">+</button>
-                        </div>
-                    </div>
-                    <div class="settings-item">
-                        <label>최대 교시</label>
-                        <div class="number-stepper">
-                            <button onclick="changePeriods(-1)">−</button>
-                            <input type="number" id="periodsInput" value="3" readonly>
-                            <button onclick="changePeriods(1)">+</button>
-                        </div>
-                    </div>
-                </div>
-                <button class="btn btn-outline" onclick="toggleTheme()" style="margin-top: 4px; padding: 8px 12px; font-size: 12px;">
-                    <svg id="themeIcon" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z"></path></svg>
-                    <span id="themeToggleText">다크 테마 전환</span>
-                </button>
-            </div>
-
-            <!-- 상태 HUD -->
-            <div class="hud-card">
-                <div class="hud-title">
-                    <span id="statusIndicator" class="status-dot"></span>
-                    ENGINE STATUS
-                </div>
-                <span id="uploadStatus" class="status-text" style="font-weight: 700; font-size: 13px;">교사 명단 미등록</span>
-            </div>
-
-            <!-- 설정 및 실행 제어 -->
-            <div class="control-group">
-                <span class="control-label">1. 교사 정보 입력</span>
-                <div class="file-upload-wrapper">
-                    <button class="btn btn-outline">
-                        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"></path></svg>
-                        교사 로스터 엑셀 로드
-                    </button>
-                    <input type="file" id="excelInput" class="file-upload-input" accept=".xlsx, .xls" />
-                </div>
-            </div>
-
-            <div class="control-group" style="margin-top: auto;">
-                <span class="control-label">2. 배정 프로세스 가동</span>
-                <button id="runBtn" class="btn btn-primary" onclick="runAssignment()" disabled>
-                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"></path></svg>
-                    배정 실행
-                </button>
-            </div>
-
-        </aside>
-
     </div>
 
     <!-- 과목 입력 모달 -->
@@ -503,16 +400,29 @@
             <div class="modal-title">시험 과목 설정</div>
             <input type="text" id="subjectInput" class="modal-input" placeholder="과목 입력 (미기입 시 삭제)" autocomplete="off">
             <div class="modal-footer">
-                <button class="btn btn-outline" style="color:#e11d48; border-color: #fecdd3; background: #fff1f2;" onclick="saveSubject('')">삭제</button>
+                <button class="btn-danger-outline" style="width: auto; padding: 6px 12px; font-size: 12px;" onclick="saveSubject('')">삭제</button>
                 <div style="display: flex; gap: 6px;">
-                    <button class="btn btn-outline" onclick="closeModal()">취소</button>
-                    <button class="btn btn-primary" style="padding: 6px 14px;" onclick="saveSubject(document.getElementById('subjectInput').value)">적용</button>
+                    <button class="btn btn-outline" style="width: auto; padding: 6px 12px; font-size: 12px;" onclick="closeModal()">취소</button>
+                    <button class="btn btn-primary" style="width: auto; padding: 6px 14px; font-size: 12px;" onclick="saveSubject(document.getElementById('subjectInput').value)">적용</button>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
+        // --- [추가] 테마 초기화 로직 (새 시스템 연동) ---
+        (function () {
+            const savedTheme = localStorage.getItem('schoolAppsTheme');
+            const systemPrefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const theme = savedTheme ? savedTheme : (systemPrefersDark ? 'dark' : 'light');
+            document.body.setAttribute('data-theme', theme);
+        })();
+
+        // 페이지 로드 후 깜빡임 방지
+        window.onload = function () {
+            setTimeout(() => { document.body.classList.remove('preload'); }, 100);
+        }
+
         const departments = ["1과", "2과", "3과", "4과"]; 
         let maxDays = 2; 
         let maxPeriods = 3; 
@@ -859,6 +769,7 @@
 
         // --- 7. 알고리즘 실행 ---
         function runAssignment() {
+            const panel = document.getElementById('controlPanel');
             const currentScheduleData = buildScheduleData();
             
             if(currentScheduleData.length === 0) {
@@ -1007,9 +918,7 @@
                     if (hwTeacher === "NO_EXAM") {
                         hwZone.innerHTML = `<span style="color:var(--text-muted); font-size:10px;">미시행</span>`;
                     } else if (hwTeacher === "SHORTAGE") {
-                        hwZone.classList.add('active');
-                        hwZone.style.borderColor = '#fecdd3';
-                        hwZone.style.background = '#fff1f2';
+                        hwZone.classList.add('error');
                         hwZone.innerHTML = `<div class="hw-error">인원 부족</div>`;
                     } else if (hwTeacher) {
                         hwZone.classList.add('active');
@@ -1245,21 +1154,20 @@
             initScheduleTable();
         }
 
+        function toggleSettings() {
+            const panel = document.getElementById('controlPanel');
+            const overlay = document.getElementById('overlay');
+            if (panel) panel.classList.toggle('active');
+            if (overlay) overlay.classList.toggle('active');
+        }
+
         function toggleTheme() {
             const body = document.body;
-            const text = document.getElementById('themeToggleText');
-            const icon = document.getElementById('themeIcon');
-            
-            body.classList.toggle('dark-theme');
-            const isDark = body.classList.contains('dark-theme');
-            
-            if (isDark) {
-                text.textContent = "라이트 테마 전환";
-                icon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.223l-1.591 1.591M5.25 12H3m4.223-4.773L5.632 5.632M12 7.5a4.5 4.5 0 100 9 4.5 4.5 0 000-9z"></path>`;
-            } else {
-                text.textContent = "다크 테마 전환";
-                icon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z"></path>`;
-            }
+            const currentTheme = body.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+
+            body.setAttribute('data-theme', newTheme);
+            localStorage.setItem('schoolAppsTheme', newTheme);
         }
 
         initScheduleTable();
